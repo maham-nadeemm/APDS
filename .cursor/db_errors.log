@@ -1,0 +1,24 @@
+Database error in execute_query: database is locked
+Query: 
+            INSERT INTO audit_logs 
+            (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        
+Params: (2, 'user_login', 'user', 2, None, None, None, None)
+Traceback (most recent call last):
+  File "C:\Users\S A Z\Desktop\NEW JUNIORS PROJECT\app\repositories\base_repository.py", line 25, in execute_query
+    cursor.execute(query, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.OperationalError: database is locked
+
+
+Database error in execute_query: FOREIGN KEY constraint failed
+Query: DELETE FROM daily_monitoring WHERE id = ?
+Params: (1,)
+Traceback (most recent call last):
+  File "C:\Users\S A Z\Desktop\NEW JUNIORS PROJECT\app\repositories\base_repository.py", line 29, in execute_query
+    cursor.execute(query, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: FOREIGN KEY constraint failed
+
+

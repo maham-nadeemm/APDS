@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Report{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.performance_report') }}" class="active">Performance Report</a>
+<a href="{{ url_for('forms.daily_monitoring') }}">Daily Monitoring</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Performance Report Generation (UC-04)</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Compile summary performance report from daily monitoring data</p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Step 1: Select Report Period</h3>
+    </div>
+    <form id="periodForm" style="padding: 1.5rem;">
+        <div class="grid grid-3">
+            <div class="form-group">
+                <label class="form-label" for="report_type">Report Type *</label>
+                <select class="form-select" id="report_type" name="report_type" required>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom Period</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="period_start">Period Start *</label>
+                <input type="date" class="form-input" id="period_start" name="period_start" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="period_end">Period End *</label>
+                <input type="date" class="form-input" id="period_end" name="period_end" required>
+            </div>
+        </div>
+        
+        <button type="button" class="btn btn-primary" onclick="compileData()">Compile Data</button>
+    </form>
+</div>
+
+<div class="card" id="compiledDataCard" style="display: none; margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Step 2: Compiled Data Summary</h3>
+    </div>
+    <div id="compiledDataContent" style="padding: 1.5rem;">
+        <!-- Compiled data will be displayed here -->
+    </div>
+</div>
+
+<div class="card" id="reportFormCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Step 3: Create Report</h3>
+    </div>
+    <form id="reportForm" style="padding: 1.5rem;">
+        <input type="hidden" id="report_period_start" name="report_period_start">
+        <input type="hidden" id="report_period_end" name="report_period_end">
+        <input type="hidden" id="report_type_hidden" name="report_type">
+        
+        <div class="form-group">
+            <label class="form-label" for="analysis">Analysis *</label>
+            <textarea class="form-textarea" id="analysis" name="analysis" rows="6" required placeholder="Provide analysis of the monitoring data, trends, and patterns observed..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="recommendations">Recommendations *</label>
+            <textarea class="form-textarea" id="recommendations" name="recommendations" rows="6" required placeholder="Provide recommendations based on the analysis..."></textarea>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Save as Draft</button>
+            <button type="button" class="btn btn-success" id="submitBtn" onclick="submitReport()">Submit for Approval</button>
+            <a href="{{ url_for('dashboard.technician_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<div id="reportId" style="display: none;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let compiledData = null;
+    let reportId = null;
+    
+    function compileData() {
+        const periodStart = document.getElementById('period_start').value;
+        const periodEnd = document.getElementById('period_end').value;
+        const reportType = document.getElementById('report_type').value;
+        
+        if (!periodStart || !periodEnd) {
+            showToast('Please select both start and end dates', 'warning');
+            return;
+        }
+        
+        fetch('/api/performance-reports/compile', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                period_start: periodStart,
+                period_end: periodEnd
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                compiledData = data.data;
+                displayCompiledData(data.data);
+                document.getElementById('compiledDataCard').style.display = 'block';
+                document.getElementById('reportFormCard').style.display = 'block';
+                
+                // Set hidden form fields
+                document.getElementById('report_period_start').value = periodStart;
+                document.getElementById('report_period_end').value = periodEnd;
+                document.getElementById('report_type_hidden').value = reportType;
+            } else {
+                showToast(data.message || 'Error compiling data', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Network error. Please try again.', 'error');
+        });
+    }
+    
+    function displayCompiledData(data) {
+        const content = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-title">Total Readings</div>
+                    <div class="stat-card-value">${data.total_readings}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-title">Normal Status</div>
+                    <div class="stat-card-value" style="color: #10b981;">${data.normal_count}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-title">Warning Status</div>
+                    <div class="stat-card-value" style="color: #f59e0b;">${data.warning_count}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-title">Critical Status</div>
+                    <div class="stat-card-value" style="color: #ef4444;">${data.critical_count}</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem;">
+                <h4>Average Readings</h4>
+                <p><strong>Average Voltage:</strong> ${data.avg_voltage} V</p>
+                <p><strong>Average Current:</strong> ${data.avg_current} A</p>
+                <p><strong>Average Power Factor:</strong> ${data.avg_power_factor}</p>
+            </div>
+        `;
+        document.getElementById('compiledDataContent').innerHTML = content;
+    }
+    
+    document.getElementById('reportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            report_period_start: document.getElementById('report_period_start').value,
+            report_period_end: document.getElementById('report_period_end').value,
+            report_type: document.getElementById('report_type_hidden').value,
+            analysis: document.getElementById('analysis').value,
+            recommendations: document.getElementById('recommendations').value
+        };
+        
+        try {
+            const response = await fetch('/api/performance-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                reportId = result.data.id;
+                document.getElementById('reportId').textContent = reportId;
+                showToast('Draft report saved successfully!', 'success');
+                document.getElementById('submitBtn').disabled = false;
+            } else {
+                showToast(result.message || 'Error saving report', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+    
+    function submitReport() {
+        if (!reportId) {
+            showToast('Please save the draft first', 'warning');
+            return;
+        }
+        
+        fetch(`/api/performance-reports/${reportId}/submit`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Report submitted for approval!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard/technician?refresh=' + Date.now();
+                }, 1500);
+            } else {
+                showToast(data.message || 'Error submitting report', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Network error. Please try again.', 'error');
+        });
+    }
+</script>
+{% endblock %}
+

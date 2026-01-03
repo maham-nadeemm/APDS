@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Equipment Status{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.daily_monitoring') }}">Daily Monitoring</a>
+<a href="{{ url_for('forms.equipment_status') }}" class="active">Equipment Status</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Equipment Status</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Equipment Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Last Maintenance</th>
+                    <th>Next Maintenance</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eq in equipment %}
+                <tr>
+                    <td>{{ eq.equipment_code }}</td>
+                    <td>{{ eq.equipment_name }}</td>
+                    <td>{{ eq.equipment_type }}</td>
+                    <td>{{ eq.location }}</td>
+                    <td>
+                        <span class="status-badge status-{{ eq.status }}">
+                            {{ eq.status }}
+                        </span>
+                    </td>
+                    <td>{{ eq.last_maintenance_date or '-' }}</td>
+                    <td>{{ eq.next_maintenance_date or '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('forms.report_fault', equipment_id=eq.id) }}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Report Fault</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

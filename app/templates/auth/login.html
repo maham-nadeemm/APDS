@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Login - APDS{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+    <h1>APDS</h1>
+    <form id="loginForm" method="POST" action="{{ url_for('auth.login') }}">
+        {% if error %}
+        <div class="alert alert-error" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem;">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" class="form-input" id="username" name="username" required autofocus>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" class="form-input" id="password" name="password" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+    </form>
+</div>
+{% endblock %}
+

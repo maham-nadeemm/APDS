@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Technician Dashboard - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}" class="active">Dashboard</a>
+<a href="{{ url_for('forms.daily_monitoring') }}">Daily Monitoring</a>
+<a href="{{ url_for('forms.equipment_status') }}">Equipment Status</a>
+<a href="{{ url_for('forms.report_fault') }}">Report Fault</a>
+<a href="{{ url_for('forms.performance_report') }}">Performance Report</a>
+<a href="{{ url_for('forms.data_reverification') }}">Data Re-verification</a>
+<a href="{{ url_for('views.monitoring_history') }}">Monitoring History</a>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Technician Dashboard - APDS</h1>
+    <p>Welcome, {{ user.full_name }}! Monitor equipment and report issues.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-title">Total Equipment</div>
+        <div class="stat-card-value" id="totalEquipment">{{ equipment|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">My Monitoring Records</div>
+        <div class="stat-card-value" id="myRecords">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Unread Notifications</div>
+        <div class="stat-card-value" id="unreadCount">{{ notifications|length }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Available Equipment</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Equipment Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="equipmentTable">
+                {% for eq in equipment %}
+                <tr>
+                    <td>{{ eq.equipment_code }}</td>
+                    <td>{{ eq.equipment_name }}</td>
+                    <td>{{ eq.equipment_type }}</td>
+                    <td>{{ eq.location }}</td>
+                    <td>
+                        <span class="status-badge status-{{ eq.status }}">
+                            {{ eq.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('forms.daily_monitoring', equipment_id=eq.id) }}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Monitor</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Monitoring Records</h2>
+    </div>
+    <div class="table-container">
+        <table id="monitoringTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Shift</th>
+                    <th>Equipment</th>
+                    <th>Voltage (V)</th>
+                    <th>Current (A)</th>
+                    <th>Power Factor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to load technician monitoring history
+    function loadMonitoringHistory() {
+        fetch('/api/monitoring/technician?limit=10')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const tbody = document.querySelector('#monitoringTable tbody');
+                    if (data.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No monitoring records found</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.data.map(record => `
+                            <tr>
+                                <td>${new Date(record.monitoring_date).toLocaleDateString()}</td>
+                                <td>${record.shift ? record.shift.charAt(0).toUpperCase() + record.shift.slice(1) : '-'}</td>
+                                <td>Equipment #${record.equipment_id}</td>
+                                <td>${record.voltage || '-'} V</td>
+                                <td>${record.current || '-'} A</td>
+                                <td>${record.power_factor || '-'}</td>
+                                <td><span class="status-badge status-${record.operational_status}">${record.operational_status}</span></td>
+                            </tr>
+                        `).join('');
+                    }
+                    document.getElementById('myRecords').textContent = data.data.length;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading monitoring history:', error);
+            });
+    }
+    
+    // Load on page load
+    loadMonitoringHistory();
+    
+    // Refresh when page becomes visible (user returns to tab)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadMonitoringHistory();
+        }
+    });
+    
+    // Refresh on window focus
+    window.addEventListener('focus', function() {
+        loadMonitoringHistory();
+    });
+    
+    // Listen for force refresh event
+    window.addEventListener('forceRefresh', function() {
+        loadMonitoringHistory();
+    });
+    
+    // Auto-refresh every 30 seconds if page is visible
+    setInterval(function() {
+        if (!document.hidden) {
+            loadMonitoringHistory();
+        }
+    }, 30000);
+</script>
+{% endblock %}
+

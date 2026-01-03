@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Trend Comparison{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.dm_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.trend_comparison') }}" class="active">Trend Comparison</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Trend Comparison</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p class="empty-state">Trend comparison view - To be implemented with comparison charts</p>
+    </div>
+</div>
+{% endblock %}
+
+
+
+

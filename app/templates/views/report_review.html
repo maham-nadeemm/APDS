@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Report Review{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.dm_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.report_review') }}" class="active">Report Review</a>
+<!-- <a href="{{ url_for('views.historical_data') }}">Historical Data</a> -->
+{% endblock %}
+
+{% block content %}
+{% if report %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Resolution Report #{{ report.id }}</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <div class="form-group">
+            <label class="form-label"><strong>Fault ID:</strong></label>
+            <p>#{{ report.fault_id }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label"><strong>Resolution Description:</strong></label>
+            <p>{{ report.resolution_description }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label"><strong>Actions Taken:</strong></label>
+            <p>{{ report.actions_taken }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label"><strong>Preventive Measures:</strong></label>
+            <p>{{ report.preventive_measures or 'N/A' }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label"><strong>Status:</strong></label>
+            <p><span class="status-badge status-{{ report.status }}">{{ report.status }}</span></p>
+        </div>
+        
+        {% if report.status == 'pending_approval' %}
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button class="btn btn-success" onclick="approveReport({{ report.id }})">Approve</button>
+            <button class="btn btn-danger" onclick="rejectReport({{ report.id }})">Reject</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Pending Reports</h2>
+    </div>
+    <div class="table-container">
+        <table id="pendingReportsTable">
+            <thead>
+                <tr>
+                    <th>Report ID</th>
+                    <th>Prepared By</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    {% if not report %}
+    fetch('/api/reports/pending')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.querySelector('#pendingReportsTable tbody');
+            if (data.success) {
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No pending reports</td></tr>';
+                } else {
+                    tbody.innerHTML = data.data.map(report => `
+                        <tr>
+                            <td>#${report.id}</td>
+                            <td>${report.prepared_by}</td>
+                            <td>${report.created_at ? new Date(report.created_at).toLocaleDateString() : '-'}</td>
+                            <td>
+                                <a href="/views/report-review?report_id=${report.id}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Review</a>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        });
+    {% endif %}
+    
+    function approveReport(reportId) {
+        if (!confirm('Are you sure you want to approve this report?')) {
+            return;
+        }
+        
+        fetch(`/api/reports/${reportId}/approve`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Report approved successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/views/report-review';
+                }, 1500);
+            } else {
+                showToast(data.message || 'Error approving report', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Network error. Please try again.', 'error');
+        });
+    }
+    
+    function rejectReport(reportId) {
+        if (!confirm('Are you sure you want to reject this report?')) {
+            return;
+        }
+        
+        showToast('Rejection functionality to be implemented', 'warning');
+    }
+</script>
+{% endblock %}
+
+
+
+

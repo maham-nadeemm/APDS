@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}APDS{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if user %}
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>APDS</h2>
+            </div>
+            <nav class="sidebar-nav">
+                {% block sidebar_menu %}{% endblock %}
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <div class="navbar-left">
+                    <button class="menu-toggle" id="menuToggle">☰</button>
+                    <span class="current-date" id="currentDate"></span>
+                </div>
+                <div class="navbar-right">
+                    <div class="notifications-dropdown">
+                        <button class="notification-btn" id="notificationBtn">
+                            🔔
+                            <span class="notification-badge" id="notificationBadge">0</span>
+                        </button>
+                        <div class="notifications-panel" id="notificationsPanel">
+                            <div class="notifications-header">
+                                <h3>Notifications</h3>
+                                <button class="mark-all-read" id="markAllRead">Mark all read</button>
+                            </div>
+                            <div class="notifications-list" id="notificationsList">
+                                <!-- Notifications will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-profile">
+                        <span class="user-name">{{ user.full_name }}</span>
+                        <span class="user-role">{{ user.role|upper }}</span>
+                        <a href="{{ url_for('auth.logout') }}" class="logout-btn">Logout</a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="content-area">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% else %}
+    <div class="auth-container">
+        {% block auth_content %}{% endblock %}
+    </div>
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dmo_dno.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

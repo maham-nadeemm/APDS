@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Historical Data{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.dm_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.historical_data') }}" class="active">Historical Data</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Historical Data</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p class="empty-state">Historical data view - To be implemented with charts and analytics</p>
+    </div>
+</div>
+{% endblock %}
+
+
+
+

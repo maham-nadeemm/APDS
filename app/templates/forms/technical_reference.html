@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Technical Reference{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.technical_reference') }}" class="active">Technical Reference</a>
+<a href="{{ url_for('forms.root_cause_analysis') }}">Root Cause Analysis</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Reference Technical Drawings and History (UC-07)</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Reference technical drawings, manuals, specifications, and history for equipment</p>
+    </div>
+    <form id="referenceForm" style="padding: 1.5rem;">
+        <div class="form-group">
+            <label class="form-label" for="equipment_id">Equipment *</label>
+            <select class="form-select" id="equipment_id" name="equipment_id" required>
+                <option value="">Select Equipment</option>
+                {% for eq in equipment %}
+                <option value="{{ eq.id }}" {% if selected_equipment_id == eq.id|string %}selected{% endif %}>
+                    {{ eq.equipment_code }} - {{ eq.equipment_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="reference_type">Reference Type *</label>
+            <select class="form-select" id="reference_type" name="reference_type" required>
+                <option value="drawing">Technical Drawing</option>
+                <option value="manual">Manual</option>
+                <option value="history">History</option>
+                <option value="specification">Specification</option>
+            </select>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="document_name">Document Name *</label>
+                <input type="text" class="form-input" id="document_name" name="document_name" required placeholder="e.g., Electrical Schematic DWG-001">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="document_version">Document Version</label>
+                <input type="text" class="form-input" id="document_version" name="document_version" placeholder="e.g., v2.1">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="findings">Findings</label>
+            <textarea class="form-textarea" id="findings" name="findings" rows="4" placeholder="Document findings from reviewing this reference..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="relevance">Relevance</label>
+            <textarea class="form-textarea" id="relevance" name="relevance" rows="3" placeholder="Describe the relevance of this reference to the current investigation..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="conclusions">Conclusions</label>
+            <textarea class="form-textarea" id="conclusions" name="conclusions" rows="4" placeholder="Document conclusions drawn from this reference..."></textarea>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Save Reference</button>
+            <a href="{{ url_for('dashboard.engineer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('referenceForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            equipment_id: document.getElementById('equipment_id').value,
+            reference_type: document.getElementById('reference_type').value,
+            document_name: document.getElementById('document_name').value,
+            document_version: document.getElementById('document_version').value || null,
+            findings: document.getElementById('findings').value || null,
+            relevance: document.getElementById('relevance').value || null,
+            conclusions: document.getElementById('conclusions').value || null
+        };
+        
+        try {
+            const response = await fetch('/api/technical-references', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Technical reference saved successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard/engineer?refresh=' + Date.now();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error saving reference', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

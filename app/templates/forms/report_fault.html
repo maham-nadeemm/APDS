@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Report Fault - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.daily_monitoring') }}">Daily Monitoring</a>
+<a href="{{ url_for('forms.equipment_status') }}">Equipment Status</a>
+<a href="{{ url_for('forms.report_fault') }}" class="active">Report Fault</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Report Fault - APDS</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Report equipment faults and issues</p>
+    </div>
+    
+    <!-- DMO Operations Panel -->
+    <div class="dmo-panel" style="padding: 1rem 1.5rem; background-color: #0f0f1a; border-bottom: 1px solid var(--card-border);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <button type="button" id="btnAdd" class="btn btn-sm btn-primary" title="Add new fault report">Add</button>
+            <button type="button" id="btnEdit" class="btn btn-sm btn-primary" title="Edit selected record">Edit</button>
+            <button type="button" id="btnDelete" class="btn btn-sm btn-danger" title="Delete selected record">Delete</button>
+            <button type="button" id="btnSave" class="btn btn-sm btn-success" title="Save current record">Save</button>
+            <button type="button" id="btnCancel" class="btn btn-sm btn-secondary" title="Cancel current operation">Cancel</button>
+            <div style="flex: 1; min-width: 200px;">
+                <input type="text" id="searchInput" class="form-input" placeholder="Search records..." style="width: 100%;">
+            </div>
+            <button type="button" id="btnSearch" class="btn btn-sm btn-info" title="Search records">Search</button>
+            <button type="button" id="btnRefresh" class="btn btn-sm btn-secondary" title="Refresh data">Refresh</button>
+            <button type="button" id="btnLoadDefaults" class="btn btn-sm btn-secondary" title="Load default values">Load Defaults</button>
+            <button type="button" id="btnHelp" class="btn btn-sm btn-info" title="Show help">Help</button>
+        </div>
+    </div>
+    
+    <!-- DNO Navigation Panel -->
+    <div class="dno-panel" style="padding: 0.75rem 1.5rem; background-color: #0a0a15; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btnFirst" class="btn btn-sm btn-secondary" title="Go to first record">⏮ First</button>
+            <button type="button" id="btnPrevious" class="btn btn-sm btn-secondary" title="Go to previous record">⏪ Previous</button>
+            <button type="button" id="btnNext" class="btn btn-sm btn-secondary" title="Go to next record">Next ⏩</button>
+            <button type="button" id="btnLast" class="btn btn-sm btn-secondary" title="Go to last record">Last ⏭</button>
+        </div>
+        <div id="recordInfo" style="color: var(--text-secondary); font-size: 0.9rem;">No records</div>
+    </div>
+    
+    <form id="faultForm" name="mainForm" class="form-container" style="padding: 1.5rem;">
+        <input type="hidden" id="fault_id" name="fault_id">
+        <div class="form-group">
+            <label class="form-label" for="equipment_id" title="Select the equipment with the fault. Required field.">Equipment *</label>
+            <select class="form-select" id="equipment_id" name="equipment_id" required
+                    title="Select the equipment experiencing the fault. This field is required.">
+                <option value="">Select Equipment</option>
+                {% for eq in equipment %}
+                <option value="{{ eq.id }}" {% if selected_equipment_id == eq.id|string %}selected{% endif %}>
+                    {{ eq.equipment_code }} - {{ eq.equipment_name }}
+                </option>
+                {% endfor %}
+            </select>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select equipment from the list</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="fault_description" title="Provide a detailed description of the fault">Fault Description *</label>
+            <textarea class="form-textarea" id="fault_description" name="fault_description" rows="6" required 
+                      placeholder="Describe the fault in detail..." 
+                      title="Enter a detailed description of the fault, including symptoms and any relevant observations"></textarea>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Provide detailed fault description</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="severity" title="Select the severity level of the fault">Severity *</label>
+            <select class="form-select" id="severity" name="severity" required
+                    title="Select fault severity: Low, Medium, High, or Critical">
+                <option value="">Select Severity</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+            </select>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select fault severity level</small>
+        </div>
+        
+        <!-- Feedback Panel -->
+        <div id="feedbackPanel" style="margin-top: 1rem; padding: 0.75rem; background-color: #0a0a15; border-radius: 6px; display: none;">
+            <div id="feedbackMessage" style="color: var(--text-primary);"></div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let faultRecords = [];
+    let currentRecordIndex = -1;
+    
+    // Initialize DMO/DNO
+    document.addEventListener('DOMContentLoaded', function() {
+        const { dmo, dno, support } = initializeDMO_DNO({
+            dmo: {
+                formId: 'faultForm',
+                apiEndpoint: '/api/faults',
+                onSave: function(data) {
+                    loadFaultRecords();
+                },
+                onDelete: function(id) {
+                    loadFaultRecords();
+                },
+                onSearch: function(query) {
+                    searchRecords(query);
+                },
+                onRefresh: function() {
+                    loadFaultRecords();
+                },
+                onLoadDefaults: function() {
+                    document.getElementById('severity').value = 'medium';
+                },
+                onHelp: function() {
+                    alert('Report Fault Form Help:\n\n' +
+                          '1. Select equipment and describe the fault\n' +
+                          '2. Choose appropriate severity level\n' +
+                          '3. Use Add to create new reports, Edit to modify, Delete to remove\n' +
+                          '4. Use navigation buttons to move between records\n' +
+                          '5. All fields marked with * are required');
+                }
+            },
+            dno: {
+                records: faultRecords,
+                onRecordChange: function(record, index) {
+                    populateForm(record);
+                    currentRecordIndex = index;
+                }
+            }
+        });
+        
+        // Add tooltips
+        support.addTooltip('equipment_id', 'Select the equipment experiencing the fault.');
+        support.addTooltip('fault_description', 'Provide a detailed description of the fault.');
+        support.addTooltip('severity', 'Select fault severity: Low, Medium, High, or Critical.');
+        
+        loadFaultRecords();
+    });
+    
+    async function loadFaultRecords() {
+        try {
+            const response = await fetch('/api/faults?limit=1000');
+            const result = await response.json();
+            if (result.success) {
+                faultRecords = result.data || [];
+                if (window.dno) {
+                    window.dno.setRecords(faultRecords);
+                }
+                showFeedback(`Loaded ${faultRecords.length} records`, 'success');
+            }
+        } catch (error) {
+            console.error('Error loading records:', error);
+        }
+    }
+    
+    function populateForm(record) {
+        if (!record) return;
+        document.getElementById('fault_id').value = record.id || '';
+        document.getElementById('equipment_id').value = record.equipment_id || '';
+        document.getElementById('fault_description').value = record.fault_description || '';
+        document.getElementById('severity').value = record.severity || '';
+        if (window.dmo) {
+            window.dmo.currentRecordId = record.id;
+            window.dmo.isEditMode = true;
+            window.dmo.updateButtonStates();
+        }
+    }
+    
+    function searchRecords(query) {
+        if (!query) {
+            loadFaultRecords();
+            return;
+        }
+        const filtered = faultRecords.filter(r => {
+            const searchStr = query.toLowerCase();
+            return (r.fault_description && r.fault_description.toLowerCase().includes(searchStr)) ||
+                   (r.severity && r.severity.toLowerCase().includes(searchStr));
+        });
+        if (window.dno) {
+            window.dno.setRecords(filtered);
+        }
+        showFeedback(`Found ${filtered.length} matching records`, 'info');
+    }
+    
+    function showFeedback(message, type = 'info') {
+        const panel = document.getElementById('feedbackPanel');
+        const msg = document.getElementById('feedbackMessage');
+        if (panel && msg) {
+            panel.style.display = 'block';
+            msg.textContent = message;
+            panel.style.backgroundColor = type === 'success' ? 'rgba(0, 255, 136, 0.1)' :
+                                         type === 'error' ? 'rgba(255, 51, 102, 0.1)' :
+                                         type === 'warning' ? 'rgba(255, 170, 0, 0.1)' :
+                                         'rgba(0, 212, 255, 0.1)';
+            msg.style.color = type === 'success' ? '#00ff88' :
+                             type === 'error' ? '#ff3366' :
+                             type === 'warning' ? '#ffaa00' :
+                             '#00d4ff';
+            setTimeout(() => { panel.style.display = 'none'; }, 3000);
+        }
+    }
+    
+    document.getElementById('faultForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Use DMO save if available
+        if (window.dmo) {
+            window.dmo.save();
+            return;
+        }
+        
+        // Fallback
+        const formData = {
+            equipment_id: parseInt(document.getElementById('equipment_id').value),
+            fault_description: document.getElementById('fault_description').value,
+            severity: document.getElementById('severity').value
+        };
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'report_fault.html:64',message:'fault form before fetch',data:{equipment_id:formData.equipment_id,severity:formData.severity},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+        // #endregion
+        
+        try {
+            const response = await fetch('/api/faults', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'report_fault.html:73',message:'fault form response received',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+            // #endregion
+            
+            const result = await response.json();
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'report_fault.html:76',message:'fault form result parsed',data:{success:result.success,message:result.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+            // #endregion
+            
+            if (result.success) {
+                showToast('Fault reported successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard/technician?refresh=' + Date.now();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error reporting fault', 'error');
+            }
+        } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'report_fault.html:84',message:'fault form error',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+            // #endregion
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Deputy General Manager Dashboard - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.dgm_dashboard') }}" class="active">Dashboard</a>
+<a href="{{ url_for('views.report_review') }}">Report Review</a>
+<a href="{{ url_for('views.fault_list') }}">Fault List</a>
+<a href="{{ url_for('views.historical_data') }}">Historical Data</a>
+<a href="{{ url_for('views.trend_comparison') }}">Trend Comparison</a>
+<a href="{{ url_for('reports.approved_reports') }}">Approved Reports</a>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Deputy General Manager Dashboard - APDS</h1>
+    <p>Welcome, {{ user.full_name }}! Overview of all operations and approvals.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-title">Pending Approvals</div>
+        <div class="stat-card-value" id="pendingApprovals">{{ pending_reports|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Total Faults</div>
+        <div class="stat-card-value" id="totalFaults">{{ faults|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Unresolved</div>
+        <div class="stat-card-value" id="unresolvedFaults">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Unread Notifications</div>
+        <div class="stat-card-value" id="unreadCount">{{ notifications|length }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Reports Pending Approval</h2>
+        <a href="{{ url_for('views.report_review') }}" class="btn btn-primary">Review All</a>
+    </div>
+    <div class="table-container">
+        <table id="pendingReportsTable">
+            <thead>
+                <tr>
+                    <th>Report ID</th>
+                    <th>Fault ID</th>
+                    <th>Type</th>
+                    <th>Prepared By</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Faults Overview</h2>
+        <a href="{{ url_for('views.fault_list') }}?refresh=1" class="btn btn-primary">View All</a>
+    </div>
+    <div class="table-container">
+        <table id="allFaultsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Equipment</th>
+                    <th>Description</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Reported At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to load dashboard data
+    function loadDashboardData() {
+        // Load faults
+        fetch('/api/faults?limit=1000&_t=' + Date.now())
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update stats
+                    const unresolved = data.data.filter(f => f.status !== 'resolved').length;
+                    document.getElementById('unresolvedFaults').textContent = unresolved;
+                    document.getElementById('totalFaults').textContent = data.data.length;
+                    
+                    // Update all faults table
+                    const tbody = document.querySelector('#allFaultsTable tbody');
+                    const recentFaults = data.data.slice(0, 20);
+                    if (recentFaults.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No faults found</td></tr>';
+                    } else {
+                        tbody.innerHTML = recentFaults.map(fault => {
+                            const statusOptions = ['reported', 'investigating', 'resolved', 'escalated'];
+                            const statusSelect = statusOptions.map(opt => 
+                                `<option value="${opt}" ${opt === fault.status ? 'selected' : ''}>${opt.charAt(0).toUpperCase() + opt.slice(1)}</option>`
+                            ).join('');
+                            
+                            return `
+                                <tr>
+                                    <td>#${fault.id}</td>
+                                    <td>Equipment #${fault.equipment_id}</td>
+                                    <td>${fault.fault_description ? (fault.fault_description.substring(0, 50) + (fault.fault_description.length > 50 ? '...' : '')) : '-'}</td>
+                                    <td><span class="status-badge status-${fault.severity}">${fault.severity}</span></td>
+                                    <td>
+                                        <select class="form-select" style="min-width: 120px; padding: 0.25rem 0.5rem; font-size: 0.875rem;" 
+                                                onchange="updateFaultStatus(${fault.id}, this.value)" 
+                                                id="status_${fault.id}">
+                                            ${statusSelect}
+                                        </select>
+                                    </td>
+                                    <td>${fault.reported_at ? new Date(fault.reported_at).toLocaleDateString() : '-'}</td>
+                                    <td>
+                                        <a href="/views/fault-list?fault_id=${fault.id}" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading faults:', error);
+            });
+        
+        // Load pending reports (both regular and performance reports)
+        fetch('/api/reports/pending?_t=' + Date.now())
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update stats
+                    document.getElementById('pendingApprovals').textContent = data.data.length;
+                    
+                    // Update pending reports table
+                    const tbody = document.querySelector('#pendingReportsTable tbody');
+                    const reports = data.data.slice(0, 10);
+                    if (reports.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No pending reports</td></tr>';
+                    } else {
+                        tbody.innerHTML = reports.map(report => {
+                            const reportType = report.report_type || 'resolution';
+                            const typeLabel = report.type_label || (reportType === 'performance' ? 'Performance Report' : 'Resolution Report');
+                            const faultId = report.fault_id ? `#${report.fault_id}` : '-';
+                            const reportLink = reportType === 'performance' 
+                                ? `/api/performance-reports/${report.id}` 
+                                : `/views/report-review?report_id=${report.id}`;
+                            
+                            return `
+                                <tr>
+                                    <td>#${report.id}</td>
+                                    <td>${faultId}</td>
+                                    <td>${typeLabel}</td>
+                                    <td>User #${report.prepared_by || report.technician_id || '-'}</td>
+                                    <td><span class="status-badge status-pending">${report.status}</span></td>
+                                    <td>${report.created_at ? new Date(report.created_at).toLocaleDateString() : '-'}</td>
+                                    <td>
+                                        <a href="${reportLink}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Review</a>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading pending reports:', error);
+            });
+    }
+    
+    // Load on page load
+    loadDashboardData();
+    
+    // Check if we should refresh (from redirect with refresh param)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('refresh')) {
+        // Remove the refresh parameter from URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        // Small delay to ensure data is committed, then refresh data
+        setTimeout(() => {
+            loadDashboardData();
+        }, 200);
+    }
+    
+    // Refresh when page becomes visible
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadDashboardData();
+        }
+    });
+    
+    // Listen for force refresh event
+    window.addEventListener('forceRefresh', function() {
+        loadDashboardData();
+    });
+    
+    // Auto-refresh every 30 seconds if page is visible
+    setInterval(function() {
+        if (!document.hidden) {
+            loadDashboardData();
+        }
+    }, 30000);
+    
+    // Update fault status
+    async function updateFaultStatus(faultId, newStatus) {
+        if (!confirm(`Change fault status to "${newStatus}"?`)) {
+            // Reset dropdown to original value
+            loadDashboardData();
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/faults/${faultId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`Fault status updated to ${newStatus}`, 'success');
+                // Reload dashboard data to reflect changes
+                setTimeout(() => {
+                    loadDashboardData();
+                }, 500);
+            } else {
+                showToast(result.message || 'Error updating status', 'error');
+                // Reset dropdown
+                loadDashboardData();
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+            console.error('Error updating fault status:', error);
+            // Reset dropdown
+            loadDashboardData();
+        }
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring History - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.monitoring_history') }}" class="active">Monitoring History</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Monitoring History - APDS</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">View and manage monitoring records</p>
+    </div>
+    
+    <!-- DMO Operations Panel -->
+    <div class="dmo-panel" style="padding: 1rem 1.5rem; background-color: #0f0f1a; border-bottom: 1px solid var(--card-border);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <button type="button" id="btnAdd" class="btn btn-sm btn-primary" title="Add new monitoring record" onclick="window.location.href='/forms/daily-monitoring'">Add</button>
+            <button type="button" id="btnEdit" class="btn btn-sm btn-primary" title="Edit selected record">Edit</button>
+            <button type="button" id="btnDelete" class="btn btn-sm btn-danger" title="Delete selected record">Delete</button>
+            <button type="button" id="btnSave" class="btn btn-sm btn-success" title="Save changes" style="display: none;">Save</button>
+            <button type="button" id="btnCancel" class="btn btn-sm btn-secondary" title="Cancel operation" style="display: none;">Cancel</button>
+            <div style="flex: 1; min-width: 200px;">
+                <input type="text" id="searchInput" class="form-input" placeholder="Search records..." style="width: 100%;" onkeyup="searchRecords(this.value)">
+            </div>
+            <button type="button" id="btnSearch" class="btn btn-sm btn-info" title="Search records" onclick="searchRecords(document.getElementById('searchInput').value)">Search</button>
+            <button type="button" id="btnRefresh" class="btn btn-sm btn-secondary" title="Refresh data" onclick="loadMonitoringHistory()">Refresh</button>
+            <button type="button" id="btnLoadDefaults" class="btn btn-sm btn-secondary" title="Load default view" onclick="loadMonitoringHistory()">Load Defaults</button>
+            <button type="button" id="btnHelp" class="btn btn-sm btn-info" title="Show help" onclick="alert('Monitoring History Help:\\n\\n1. View all monitoring records in the table\\n2. Use Search to find specific records\\n3. Click Add to create new monitoring record\\n4. Use navigation buttons to move between records\\n5. Click Refresh to reload data')">Help</button>
+        </div>
+    </div>
+    
+    <!-- DNO Navigation Panel -->
+    <div class="dno-panel" style="padding: 0.75rem 1.5rem; background-color: #0a0a15; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btnFirst" class="btn btn-sm btn-secondary" title="Go to first record" onclick="navigateToRecord('first')">⏮ First</button>
+            <button type="button" id="btnPrevious" class="btn btn-sm btn-secondary" title="Go to previous record" onclick="navigateToRecord('previous')">⏪ Previous</button>
+            <button type="button" id="btnNext" class="btn btn-sm btn-secondary" title="Go to next record" onclick="navigateToRecord('next')">Next ⏩</button>
+            <button type="button" id="btnLast" class="btn btn-sm btn-secondary" title="Go to last record" onclick="navigateToRecord('last')">Last ⏭</button>
+        </div>
+        <div id="recordInfo" style="color: var(--text-secondary); font-size: 0.9rem;">No records selected</div>
+    </div>
+    
+    <!-- Feedback Panel -->
+    <div id="feedbackPanel" style="padding: 0.75rem 1.5rem; background-color: #0a0a15; border-bottom: 1px solid var(--card-border); display: none;">
+        <div id="feedbackMessage" style="color: var(--text-primary);"></div>
+    </div>
+    
+    <div class="table-container">
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Shift</th>
+                    <th>Equipment</th>
+                    <th>Voltage (V)</th>
+                    <th>Current (A)</th>
+                    <th>Power Factor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allRecords = [];
+    let filteredRecords = [];
+    let currentRecordIndex = -1;
+    
+    function loadMonitoringHistory() {
+        fetch('/api/monitoring/technician?limit=1000')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.querySelector('#historyTable tbody');
+                if (data.success) {
+                    allRecords = data.data || [];
+                    filteredRecords = allRecords;
+                    if (allRecords.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No monitoring records found</td></tr>';
+                        updateNavigationButtons();
+                        showFeedback('No records found', 'info');
+                    } else {
+                        renderTable(filteredRecords);
+                        updateNavigationButtons();
+                        showFeedback(`Loaded ${allRecords.length} records`, 'success');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading monitoring history:', error);
+                showFeedback('Error loading records', 'error');
+            });
+    }
+    
+    function renderTable(records) {
+        const tbody = document.querySelector('#historyTable tbody');
+        if (records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No records found</td></tr>';
+        } else {
+            tbody.innerHTML = records.map((record, index) => `
+                <tr onclick="selectRecord(${index})" style="cursor: pointer;" class="${currentRecordIndex === index ? 'selected' : ''}">
+                    <td>${formatDate(record.monitoring_date)}</td>
+                    <td>${record.shift ? record.shift.charAt(0).toUpperCase() + record.shift.slice(1) : '-'}</td>
+                    <td>Equipment #${record.equipment_id}</td>
+                    <td>${record.voltage || '-'} V</td>
+                    <td>${record.current || '-'} A</td>
+                    <td>${record.power_factor || '-'}</td>
+                    <td><span class="status-badge status-${record.operational_status}">${record.operational_status}</span></td>
+                </tr>
+            `).join('');
+        }
+    }
+    
+    function selectRecord(index) {
+        currentRecordIndex = index;
+        renderTable(filteredRecords);
+        updateNavigationButtons();
+        const record = filteredRecords[index];
+        if (record) {
+            showFeedback(`Selected record ${index + 1} of ${filteredRecords.length}`, 'info');
+        }
+    }
+    
+    function searchRecords(query) {
+        if (!query) {
+            filteredRecords = allRecords;
+        } else {
+            const searchStr = query.toLowerCase();
+            filteredRecords = allRecords.filter(r => {
+                return (r.shift && r.shift.toLowerCase().includes(searchStr)) ||
+                       (r.operational_status && r.operational_status.toLowerCase().includes(searchStr)) ||
+                       (r.equipment_id && r.equipment_id.toString().includes(searchStr));
+            });
+        }
+        currentRecordIndex = -1;
+        renderTable(filteredRecords);
+        updateNavigationButtons();
+        showFeedback(`Found ${filteredRecords.length} matching records`, 'info');
+    }
+    
+    function navigateToRecord(direction) {
+        if (filteredRecords.length === 0) {
+            showFeedback('No records available', 'warning');
+            return;
+        }
+        
+        switch(direction) {
+            case 'first':
+                currentRecordIndex = 0;
+                break;
+            case 'last':
+                currentRecordIndex = filteredRecords.length - 1;
+                break;
+            case 'previous':
+                if (currentRecordIndex > 0) currentRecordIndex--;
+                else { showFeedback('Already at first record', 'warning'); return; }
+                break;
+            case 'next':
+                if (currentRecordIndex < filteredRecords.length - 1) currentRecordIndex++;
+                else { showFeedback('Already at last record', 'warning'); return; }
+                break;
+        }
+        
+        renderTable(filteredRecords);
+        updateNavigationButtons();
+        const record = filteredRecords[currentRecordIndex];
+        if (record) {
+            document.querySelector(`#historyTable tbody tr:nth-child(${currentRecordIndex + 1})`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showFeedback(`Showing record ${currentRecordIndex + 1} of ${filteredRecords.length}`, 'info');
+        }
+    }
+    
+    function updateNavigationButtons() {
+        const hasRecords = filteredRecords.length > 0;
+        const isFirst = currentRecordIndex <= 0;
+        const isLast = currentRecordIndex >= filteredRecords.length - 1;
+        
+        document.getElementById('btnFirst').disabled = !hasRecords || isFirst;
+        document.getElementById('btnPrevious').disabled = !hasRecords || isFirst;
+        document.getElementById('btnNext').disabled = !hasRecords || isLast;
+        document.getElementById('btnLast').disabled = !hasRecords || isLast;
+        
+        const recordInfo = document.getElementById('recordInfo');
+        if (hasRecords && currentRecordIndex >= 0) {
+            recordInfo.textContent = `Record ${currentRecordIndex + 1} of ${filteredRecords.length}`;
+        } else if (hasRecords) {
+            recordInfo.textContent = `${filteredRecords.length} records available`;
+        } else {
+            recordInfo.textContent = 'No records';
+        }
+    }
+    
+    function showFeedback(message, type = 'info') {
+        const panel = document.getElementById('feedbackPanel');
+        const msg = document.getElementById('feedbackMessage');
+        if (panel && msg) {
+            panel.style.display = 'block';
+            msg.textContent = message;
+            panel.style.backgroundColor = type === 'success' ? 'rgba(0, 255, 136, 0.1)' :
+                                         type === 'error' ? 'rgba(255, 51, 102, 0.1)' :
+                                         type === 'warning' ? 'rgba(255, 170, 0, 0.1)' :
+                                         'rgba(0, 212, 255, 0.1)';
+            msg.style.color = type === 'success' ? '#00ff88' :
+                             type === 'error' ? '#ff3366' :
+                             type === 'warning' ? '#ffaa00' :
+                             '#00d4ff';
+            setTimeout(() => { panel.style.display = 'none'; }, 3000);
+        }
+    }
+    
+    // Load on page load
+    loadMonitoringHistory();
+    
+    // Refresh when page becomes visible
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadMonitoringHistory();
+        }
+    });
+    
+    // Refresh on window focus
+    window.addEventListener('focus', function() {
+        loadMonitoringHistory();
+    });
+</script>
+{% endblock %}
+

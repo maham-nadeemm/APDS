@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation Package{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.documentation_package') }}" class="active">Documentation Package</a>
+<a href="{{ url_for('forms.root_cause_analysis') }}">Root Cause Analysis</a>
+{% endblock %}
+
+{% block content %}
+{% if fault %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Related Fault</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p><strong>Fault ID:</strong> {{ fault.id }}</p>
+        <p><strong>Description:</strong> {{ fault.fault_description or '-' }}</p>
+        <p><strong>Status:</strong> <span class="status-badge status-{{ fault.status }}">{{ fault.status }}</span></p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Documentation Package (UC-09, UC-10)</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Create and manage documentation packages for fault resolution</p>
+    </div>
+    <form id="packageForm" style="padding: 1.5rem;">
+        {% if fault %}
+        <input type="hidden" id="fault_id" name="fault_id" value="{{ fault.id }}">
+        {% else %}
+        <div class="form-group">
+            <label class="form-label" for="fault_id">Fault ID *</label>
+            <input type="number" class="form-input" id="fault_id" name="fault_id" required>
+            <small style="color: #64748b;">Enter the ID of the fault this documentation package relates to</small>
+        </div>
+        {% endif %}
+        
+        <div class="form-group">
+            <label class="form-label" for="package_name">Package Name *</label>
+            <input type="text" class="form-input" id="package_name" name="package_name" required placeholder="e.g., Fault Resolution Documentation - Equipment #123">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="documentation_type">Documentation Type</label>
+            <select class="form-select" id="documentation_type" name="documentation_type">
+                <option value="">Select type...</option>
+                <option value="resolution">Resolution Documentation</option>
+                <option value="maintenance">Maintenance Documentation</option>
+                <option value="compliance">Compliance Documentation</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Create Package</button>
+            <a href="{{ url_for('dashboard.engineer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" id="packageDetailsCard" style="display: none; margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Package Details</h3>
+        <div id="packageStatus" style="margin-top: 0.5rem;"></div>
+    </div>
+    <div id="packageDetailsContent" style="padding: 1.5rem;">
+        <!-- Package details and items will be displayed here -->
+    </div>
+</div>
+
+<div class="card" id="itemsCard" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Documentation Items</h3>
+    </div>
+    <div style="padding: 1.5rem;">
+        <div id="itemsList" style="margin-bottom: 1.5rem;">
+            <!-- Items will be listed here -->
+        </div>
+        
+        <form id="itemForm">
+            <input type="hidden" id="current_package_id" name="package_id">
+            <h4 style="margin-bottom: 1rem;">Add New Document</h4>
+            <div class="form-group">
+                <label class="form-label" for="document_name">Document Name *</label>
+                <input type="text" class="form-input" id="document_name" name="document_name" required>
+            </div>
+            
+            <div class="grid grid-2">
+                <div class="form-group">
+                    <label class="form-label" for="document_type">Document Type</label>
+                    <select class="form-select" id="document_type" name="document_type">
+                        <option value="">Select type...</option>
+                        <option value="report">Report</option>
+                        <option value="drawing">Drawing</option>
+                        <option value="manual">Manual</option>
+                        <option value="certificate">Certificate</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="version">Version</label>
+                    <input type="text" class="form-input" id="version" name="version" placeholder="e.g., 1.0, 2.1">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="content">Content/Description *</label>
+                <textarea class="form-textarea" id="content" name="content" rows="4" required placeholder="Enter document content or description..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Add Document</button>
+        </form>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="button" class="btn btn-success" id="completeBtn" onclick="completePackage()">Mark Package Complete</button>
+            <button type="button" class="btn btn-warning" id="submitBtn" onclick="submitPackage()" style="display: none;">Submit for Approval</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPackageId = null;
+    
+    document.getElementById('packageForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            fault_id: parseInt(document.getElementById('fault_id').value),
+            package_name: document.getElementById('package_name').value,
+            documentation_type: document.getElementById('documentation_type').value || null
+        };
+        
+        try {
+            const response = await fetch('/api/documentation-packages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                currentPackageId = result.data.id;
+                document.getElementById('current_package_id').value = currentPackageId;
+                document.getElementById('packageForm').style.display = 'none';
+                document.getElementById('packageDetailsCard').style.display = 'block';
+                document.getElementById('itemsCard').style.display = 'block';
+                loadPackageDetails(currentPackageId);
+                showToast('Package created successfully!', 'success');
+            } else {
+                showToast(result.message || 'Error creating package', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+    
+    document.getElementById('itemForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            package_id: parseInt(document.getElementById('current_package_id').value),
+            document_name: document.getElementById('document_name').value,
+            document_type: document.getElementById('document_type').value || null,
+            content: document.getElementById('content').value,
+            version: document.getElementById('version').value || null
+        };
+        
+        try {
+            const response = await fetch(`/api/documentation-packages/${formData.package_id}/items`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('itemForm').reset();
+                loadPackageDetails(currentPackageId);
+                showToast('Document added successfully!', 'success');
+            } else {
+                showToast(result.message || 'Error adding document', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+    
+    async function loadPackageDetails(packageId) {
+        try {
+            const response = await fetch(`/api/documentation-packages/${packageId}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                const package = result.data;
+                const statusBadge = `<span class="status-badge status-${package.status}">${package.status}</span>`;
+                document.getElementById('packageStatus').innerHTML = statusBadge;
+                
+                let itemsHtml = '';
+                if (package.items && package.items.length > 0) {
+                    itemsHtml = '<h4 style="margin-bottom: 1rem;">Existing Documents</h4><div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Version</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                    package.items.forEach(item => {
+                        itemsHtml += `<tr>
+                            <td>${item.document_name}</td>
+                            <td>${item.document_type || '-'}</td>
+                            <td>${item.version || '-'}</td>
+                            <td><span class="status-badge status-${item.status}">${item.status}</span></td>
+                            <td><button class="btn btn-sm btn-danger" onclick="deleteItem(${item.id})">Delete</button></td>
+                        </tr>`;
+                    });
+                    itemsHtml += '</tbody></table></div>';
+                } else {
+                    itemsHtml = '<p style="color: #64748b;">No documents added yet. Add your first document below.</p>';
+                }
+                
+                document.getElementById('itemsList').innerHTML = itemsHtml;
+                
+                if (package.status === 'completed') {
+                    document.getElementById('completeBtn').style.display = 'none';
+                    document.getElementById('submitBtn').style.display = 'inline-block';
+                } else if (package.status === 'submitted' || package.status === 'approved') {
+                    document.getElementById('completeBtn').style.display = 'none';
+                    document.getElementById('submitBtn').style.display = 'none';
+                    document.getElementById('itemForm').style.display = 'none';
+                }
+            }
+        } catch (error) {
+            showToast('Error loading package details', 'error');
+        }
+    }
+    
+    async function deleteItem(itemId) {
+        if (!confirm('Are you sure you want to delete this document?')) return;
+        
+        try {
+            const response = await fetch(`/api/documentation-packages/items/${itemId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                loadPackageDetails(currentPackageId);
+                showToast('Document deleted successfully', 'success');
+            } else {
+                showToast(result.message || 'Error deleting document', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    }
+    
+    async function completePackage() {
+        try {
+            const response = await fetch(`/api/documentation-packages/${currentPackageId}/complete`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                loadPackageDetails(currentPackageId);
+                showToast('Package marked as complete! You can now submit it.', 'success');
+            } else {
+                showToast(result.message || 'Error completing package', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    }
+    
+    async function submitPackage() {
+        if (!confirm('Are you sure you want to submit this package for approval?')) return;
+        
+        try {
+            const response = await fetch(`/api/documentation-packages/${currentPackageId}/submit`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                loadPackageDetails(currentPackageId);
+                showToast('Package submitted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard/engineer?refresh=' + Date.now();
+                }, 2000);
+            } else {
+                showToast(result.message || 'Error submitting package', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Engineer Dashboard - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}" class="active">Dashboard</a>
+<a href="{{ url_for('forms.root_cause_analysis') }}">Root Cause Analysis</a>
+<a href="{{ url_for('forms.technical_reference') }}">Technical Reference</a>
+<a href="{{ url_for('forms.draft_resolution') }}">Draft Resolution</a>
+<a href="{{ url_for('views.fault_list') }}">Fault List</a>
+<!-- <a href="{{ url_for('views.escalation_timeline') }}">Escalation Timeline</a> -->
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Engineer Dashboard - APDS</h1>
+    <p>Welcome, {{ user.full_name }}! Analyze faults and create resolution reports.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-title">Total Faults</div>
+        <div class="stat-card-value" id="totalFaults">{{ faults|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Unresolved Faults</div>
+        <div class="stat-card-value" id="unresolvedFaults">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Critical Monitoring</div>
+        <div class="stat-card-value" id="criticalMonitoring">{{ critical_monitoring|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-title">Unread Notifications</div>
+        <div class="stat-card-value" id="unreadCount">{{ notifications|length }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Faults</h2>
+        <a href="{{ url_for('views.fault_list') }}?refresh=1" class="btn btn-primary">View All</a>
+    </div>
+    <div class="table-container">
+        <table id="recentFaultsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Equipment</th>
+                    <th>Description</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Reported At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Critical Monitoring Alerts</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Shift</th>
+                    <th>Equipment</th>
+                    <th>Status</th>
+                    <th>Voltage (V)</th>
+                    <th>Current (A)</th>
+                    <th>Power Factor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for monitoring in critical_monitoring[:10] %}
+                <tr>
+                    <td>{{ monitoring.monitoring_date[:10] if monitoring.monitoring_date else '-' }}</td>
+                    <td>{{ monitoring.shift or '-' }}</td>
+                    <td>Equipment #{{ monitoring.equipment_id }}</td>
+                    <td><span class="status-badge status-critical">Critical</span></td>
+                    <td>{{ monitoring.voltage or '-' }} V</td>
+                    <td>{{ monitoring.current or '-' }} A</td>
+                    <td>{{ monitoring.power_factor or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to load unresolved faults count and recent faults table
+    function loadFaultStats() {
+        fetch('/api/faults?limit=1000&_t=' + Date.now())
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const faults = data.data || [];
+                    const unresolved = faults.filter(f => f.status !== 'resolved').length;
+                    document.getElementById('unresolvedFaults').textContent = unresolved;
+                    document.getElementById('totalFaults').textContent = faults.length;
+                    
+                    // Update recent faults table
+                    const tbody = document.querySelector('#recentFaultsTable tbody');
+                    const recentFaults = faults.slice(0, 10);
+                    if (recentFaults.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No faults found</td></tr>';
+                    } else {
+                        tbody.innerHTML = recentFaults.map(fault => {
+                            const description = fault.fault_description || '';
+                            const shortDesc = description.length > 50 ? description.substring(0, 50) + '...' : description;
+                            return `
+                            <tr>
+                                <td>#${fault.id}</td>
+                                <td>Equipment #${fault.equipment_id}</td>
+                                <td>${shortDesc || '-'}</td>
+                                <td><span class="status-badge status-${fault.severity}">${fault.severity}</span></td>
+                                <td><span class="status-badge status-${fault.status}">${fault.status}</span></td>
+                                <td>${fault.reported_at ? new Date(fault.reported_at).toLocaleDateString() : '-'}</td>
+                                <td>
+                                    <a href="/forms/root-cause-analysis?fault_id=${fault.id}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Analyze</a>
+                                </td>
+                            </tr>
+                        `;
+                        }).join('');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading fault stats:', error);
+            });
+    }
+    
+    // Load on page load
+    loadFaultStats();
+    
+    // Check if we should reload (from redirect with refresh param)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('refresh')) {
+        // Remove the refresh parameter from URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        // Small delay to ensure data is committed, then refresh data
+        setTimeout(() => {
+            loadFaultStats();
+        }, 200);
+    }
+    
+    // Refresh when page becomes visible
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadFaultStats();
+        }
+    });
+    
+    // Listen for force refresh event
+    window.addEventListener('forceRefresh', function() {
+        loadFaultStats();
+    });
+    
+    // Auto-refresh every 30 seconds if page is visible
+    setInterval(function() {
+        if (!document.hidden) {
+            loadFaultStats();
+        }
+    }, 30000);
+    
+    // Refresh stats when page becomes visible (but don't reload full page)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadFaultStats();
+        }
+    });
+    
+    // Listen for force refresh event
+    window.addEventListener('forceRefresh', function() {
+        loadFaultStats();
+    });
+    
+    // Auto-refresh every 30 seconds if page is visible
+    setInterval(function() {
+        if (!document.hidden) {
+            loadFaultStats();
+        }
+    }, 30000);
+</script>
+{% endblock %}
+

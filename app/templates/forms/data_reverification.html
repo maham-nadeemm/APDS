@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Data Re-verification{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.data_reverification') }}" class="active">Data Re-verification</a>
+<a href="{{ url_for('forms.daily_monitoring') }}">Daily Monitoring</a>
+{% endblock %}
+
+{% block content %}
+{% if original_monitoring %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Original Monitoring Record</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <div class="grid grid-3">
+            <div>
+                <strong>Voltage:</strong> {{ original_monitoring.voltage or '-' }} V
+            </div>
+            <div>
+                <strong>Current:</strong> {{ original_monitoring.current or '-' }} A
+            </div>
+            <div>
+                <strong>Power Factor:</strong> {{ original_monitoring.power_factor or '-' }}
+            </div>
+        </div>
+        <p style="margin-top: 1rem;"><strong>Date:</strong> {{ original_monitoring.monitoring_date[:10] if original_monitoring.monitoring_date else '-' }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Data Re-verification (UC-05)</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Re-verify previously recorded data with new measurements</p>
+    </div>
+    <form id="reverificationForm" style="padding: 1.5rem;">
+        {% if original_monitoring %}
+        <input type="hidden" id="original_monitoring_id" name="original_monitoring_id" value="{{ original_monitoring.id }}">
+        {% else %}
+        <div class="form-group">
+            <label class="form-label" for="original_monitoring_id">Original Monitoring Record ID *</label>
+            <input type="number" class="form-input" id="original_monitoring_id" name="original_monitoring_id" required>
+            <small style="color: #64748b;">Enter the ID of the monitoring record to re-verify</small>
+        </div>
+        {% endif %}
+        
+        <div class="card" style="margin: 1.5rem 0; padding: 1rem; background-color: #f8fafc;">
+            <h3 style="margin-bottom: 1rem; color: #1e293b;">New Readings</h3>
+            <div class="grid grid-3">
+                <div class="form-group">
+                    <label class="form-label" for="new_voltage">New Voltage (V) *</label>
+                    <input type="number" step="0.1" class="form-input" id="new_voltage" name="new_voltage" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="new_current">New Current (A) *</label>
+                    <input type="number" step="0.1" class="form-input" id="new_current" name="new_current" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="new_power_factor">New Power Factor *</label>
+                    <input type="number" step="0.01" min="0" max="1" class="form-input" id="new_power_factor" name="new_power_factor" required>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="tolerance_levels">Tolerance Levels (Optional)</label>
+            <input type="text" class="form-input" id="tolerance_levels" name="tolerance_levels" placeholder="e.g., Voltage: ±5V, Current: ±5A, PF: ±0.05">
+            <small style="color: #64748b;">Default: Voltage ±5V, Current ±5A, Power Factor ±0.05</small>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Submit Re-verification</button>
+            <a href="{{ url_for('dashboard.technician_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" id="comparisonCard" style="display: none; margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Comparison Results</h3>
+    </div>
+    <div id="comparisonContent" style="padding: 1.5rem;">
+        <!-- Comparison results will be displayed here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('reverificationForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            original_monitoring_id: document.getElementById('original_monitoring_id').value,
+            new_voltage: parseFloat(document.getElementById('new_voltage').value),
+            new_current: parseFloat(document.getElementById('new_current').value),
+            new_power_factor: parseFloat(document.getElementById('new_power_factor').value),
+            tolerance_levels: document.getElementById('tolerance_levels').value || null
+        };
+        
+        try {
+            const response = await fetch('/api/data-reverification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const data = result.data;
+                
+                // Display comparison results
+                const comparisonContent = `
+                    <div class="grid grid-2">
+                        <div>
+                            <h4>Original Readings</h4>
+                            <p>Voltage: ${data.original_voltage || '-'} V</p>
+                            <p>Current: ${data.original_current || '-'} A</p>
+                            <p>Power Factor: ${data.original_power_factor || '-'}</p>
+                        </div>
+                        <div>
+                            <h4>New Readings</h4>
+                            <p>Voltage: ${data.new_voltage || '-'} V</p>
+                            <p>Current: ${data.new_current || '-'} A</p>
+                            <p>Power Factor: ${data.new_power_factor || '-'}</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem;">
+                        <h4>Variances</h4>
+                        <p>Voltage Variance: ${data.variance_voltage ? data.variance_voltage.toFixed(2) : '-'} V</p>
+                        <p>Current Variance: ${data.variance_current ? data.variance_current.toFixed(2) : '-'} A</p>
+                        <p>Power Factor Variance: ${data.variance_power_factor ? data.variance_power_factor.toFixed(3) : '-'}</p>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem; padding: 1rem; background-color: ${data.status === 'verified' ? '#d1fae5' : '#fee2e2'}; border-radius: 6px;">
+                        <h4>Status: <span class="status-badge status-${data.status}">${data.status}</span></h4>
+                        <p><strong>Comparison Results:</strong> ${data.comparison_results || '-'}</p>
+                        <p><strong>Tolerance Levels:</strong> ${data.tolerance_levels || '-'}</p>
+                    </div>
+                    
+                    ${data.status === 'discrepancy' ? '<p style="margin-top: 1rem; color: #f59e0b;"><strong>Note:</strong> This re-verification requires engineer approval due to discrepancies.</p>' : ''}
+                `;
+                
+                document.getElementById('comparisonContent').innerHTML = comparisonContent;
+                document.getElementById('comparisonCard').style.display = 'block';
+                
+                if (data.status === 'verified') {
+                    showToast('Re-verification completed successfully! All readings within tolerance.', 'success');
+                } else {
+                    showToast('Re-verification completed with discrepancies. Engineer approval required.', 'warning');
+                }
+                
+                setTimeout(() => {
+                    window.location.href = '/dashboard/technician?refresh=' + Date.now();
+                }, 3000);
+            } else {
+                showToast(result.message || 'Error creating re-verification', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

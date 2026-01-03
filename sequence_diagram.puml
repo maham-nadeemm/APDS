@@ -1,0 +1,29 @@
+@startuml Operations Monitoring System - Sequence Diagram
+
+skinparam sequenceMessageAlign center
+skinparam lifelineStrategy solid
+
+actor Technician
+participant "Fault Service" as FS
+participant Engineer
+participant "Report Service" as RS
+participant DM
+
+== Fault Resolution Workflow ==
+
+Technician -> FS: reportFault(equipment_id, description)
+FS --> Technician: fault created
+FS -> Engineer: notify("New fault")
+
+Engineer -> FS: investigate(fault_id)
+Engineer -> RS: createReport(fault_id, resolution)
+RS --> Engineer: report created
+
+Engineer -> RS: submitForApproval(report_id)
+RS -> DM: notify("Report pending")
+
+DM -> RS: approveReport(report_id)
+RS -> FS: markFaultResolved()
+RS --> DM: report approved
+
+@enduml

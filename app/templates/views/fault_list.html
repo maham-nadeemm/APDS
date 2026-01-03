@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Fault List{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.fault_list') }}" class="active">Fault List</a>
+<a href="{{ url_for('views.escalation_timeline') }}">Escalation Timeline</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Fault List</h2>
+        <div>
+            <select id="statusFilter" class="form-select" style="display: inline-block; width: auto; margin-right: 1rem;">
+                <option value="">All Status</option>
+                <option value="reported">Reported</option>
+                <option value="investigating">Investigating</option>
+                <option value="resolved">Resolved</option>
+                <option value="escalated">Escalated</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadFaults()" title="Refresh fault list">🔄 Refresh</button>
+        </div>
+    </div>
+    <div class="table-container">
+        <table id="faultsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Equipment</th>
+                    <th>Description</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Reported At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="empty-state">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function loadFaults() {
+        const statusFilter = document.getElementById('statusFilter').value;
+        // Add cache-busting parameter to ensure fresh data
+        let url = '/api/faults?limit=1000&_t=' + Date.now();
+        
+        fetch(url, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.querySelector('#faultsTable tbody');
+                if (data.success) {
+                    let faults = data.data || [];
+                    if (statusFilter) {
+                        faults = faults.filter(f => f.status === statusFilter);
+                    }
+                    
+                    if (faults.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No faults found</td></tr>';
+                    } else {
+                        tbody.innerHTML = faults.map(fault => {
+                            const description = fault.fault_description || '';
+                            const shortDesc = description.length > 50 ? description.substring(0, 50) + '...' : description;
+                            return `
+                            <tr>
+                                <td>#${fault.id}</td>
+                                <td>Equipment #${fault.equipment_id}</td>
+                                <td>${shortDesc || '-'}</td>
+                                <td><span class="status-badge status-${fault.severity}">${fault.severity}</span></td>
+                                <td><span class="status-badge status-${fault.status}">${fault.status}</span></td>
+                                <td>${fault.reported_at ? new Date(fault.reported_at).toLocaleDateString() : '-'}</td>
+                                <td>
+                                    <a href="/forms/root-cause-analysis?fault_id=${fault.id}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">View</a>
+                                </td>
+                            </tr>
+                        `;
+                        }).join('');
+                    }
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error loading faults</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading faults:', error);
+                const tbody = document.querySelector('#faultsTable tbody');
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error loading faults. Please try again.</td></tr>';
+            });
+    }
+    
+    document.getElementById('statusFilter').addEventListener('change', loadFaults);
+    
+    // Check if we should refresh (from redirect with refresh param)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('refresh')) {
+        // Remove the refresh parameter from URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        // Force immediate refresh
+        setTimeout(() => {
+            loadFaults();
+        }, 100);
+    } else {
+        // Load on page load
+        loadFaults();
+    }
+    
+    // Refresh when page becomes visible
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            loadFaults();
+        }
+    });
+    
+    // Refresh on window focus
+    window.addEventListener('focus', function() {
+        loadFaults();
+    });
+    
+    // Listen for force refresh event
+    window.addEventListener('forceRefresh', function() {
+        loadFaults();
+    });
+    
+    // Auto-refresh every 30 seconds if page is visible
+    setInterval(function() {
+        if (!document.hidden) {
+            loadFaults();
+        }
+    }, 30000);
+</script>
+{% endblock %}
+

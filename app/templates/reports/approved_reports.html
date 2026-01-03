@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Approved Reports{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.dgm_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('reports.approved_reports') }}" class="active">Approved Reports</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Approved Reports Archive</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p class="empty-state">Approved reports archive - To be implemented with report listing and download functionality</p>
+    </div>
+</div>
+{% endblock %}
+
+
+
+

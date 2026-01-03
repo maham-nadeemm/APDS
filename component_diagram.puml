@@ -1,0 +1,39 @@
+@startuml Operations Monitoring System - Component Diagram
+
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+
+package "Presentation Layer" #F5F5F5 {
+    component [Web UI] as UI
+    component [Controllers] as Controllers
+    component [API Routes] as Routes
+}
+
+package "Application Layer" #E8F5E9 {
+    component [Services] as Services
+    component [Design Patterns] as Patterns
+}
+
+package "Domain Layer" #E3F2FD {
+    component [Domain Models] as Models
+}
+
+package "Infrastructure Layer" #FFF3E0 {
+    component [Repositories] as Repositories
+    database "SQLite Database" as DB
+}
+
+' Interactions
+UI --> Routes : HTTP Requests
+Routes --> Controllers : calls
+Controllers --> Services : orchestrates
+Services --> Repositories : uses
+Services --> Patterns : implements
+Repositories --> DB : persists
+Repositories --> Models : maps to
+Services ..> Models : references
+
+note right of Patterns : Factory, Strategy,\nObserver, etc.
+
+@enduml

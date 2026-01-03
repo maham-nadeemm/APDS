@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Delivery/Service Verification{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.delivery_verification') }}" class="active">Delivery Verification</a>
+<a href="{{ url_for('forms.vendor_management') }}">Vendor Management</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Delivery/Service Verification (UC-13, UC-14)</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Verify vendor deliveries and services</p>
+    </div>
+    <form id="verificationForm" style="padding: 1.5rem;">
+        <div class="form-group">
+            <label class="form-label" for="verification_type">Verification Type *</label>
+            <select class="form-select" id="verification_type" name="verification_type" required onchange="toggleDateFields()">
+                <option value="">Select type...</option>
+                <option value="delivery">Delivery Verification</option>
+                <option value="service">Service Verification</option>
+            </select>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="vendor_id">Vendor *</label>
+                <select class="form-select" id="vendor_id" name="vendor_id" required>
+                    <option value="">Select vendor...</option>
+                    {% for vendor in vendors %}
+                    <option value="{{ vendor.id }}" {% if selected_vendor_id and vendor.id == selected_vendor_id|int %}selected{% endif %}>{{ vendor.vendor_name }} ({{ vendor.vendor_code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="equipment_id">Equipment *</label>
+                <select class="form-select" id="equipment_id" name="equipment_id" required>
+                    <option value="">Select equipment...</option>
+                    {% for eq in equipment %}
+                    <option value="{{ eq.id }}" {% if selected_equipment_id and eq.id == selected_equipment_id|int %}selected{% endif %}>{{ eq.equipment_name }} ({{ eq.equipment_code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div id="deliveryDateField" class="form-group" style="display: none;">
+            <label class="form-label" for="delivery_date">Delivery Date *</label>
+            <input type="date" class="form-input" id="delivery_date" name="delivery_date">
+        </div>
+        
+        <div id="serviceDateField" class="form-group" style="display: none;">
+            <label class="form-label" for="service_date">Service Date *</label>
+            <input type="date" class="form-input" id="service_date" name="service_date">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="quality_assessment">Quality Assessment</label>
+            <textarea class="form-textarea" id="quality_assessment" name="quality_assessment" rows="4" placeholder="Enter quality assessment notes..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="supporting_documents">Supporting Documents</label>
+            <textarea class="form-textarea" id="supporting_documents" name="supporting_documents" rows="3" placeholder="List supporting documents or reference numbers..."></textarea>
+            <small style="color: #64748b;">Enter document names, reference numbers, or file locations</small>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Create Verification</button>
+            <a href="{{ url_for('dashboard.engineer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<div class="card" id="verificationResultCard" style="display: none; margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Verification Created</h3>
+    </div>
+    <div id="verificationResultContent" style="padding: 1.5rem;">
+        <!-- Verification result will be displayed here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleDateFields() {
+        const verificationType = document.getElementById('verification_type').value;
+        const deliveryDateField = document.getElementById('deliveryDateField');
+        const serviceDateField = document.getElementById('serviceDateField');
+        const deliveryDateInput = document.getElementById('delivery_date');
+        const serviceDateInput = document.getElementById('service_date');
+        
+        if (verificationType === 'delivery') {
+            deliveryDateField.style.display = 'block';
+            serviceDateField.style.display = 'none';
+            deliveryDateInput.setAttribute('required', 'required');
+            serviceDateInput.removeAttribute('required');
+        } else if (verificationType === 'service') {
+            deliveryDateField.style.display = 'none';
+            serviceDateField.style.display = 'block';
+            deliveryDateInput.removeAttribute('required');
+            serviceDateInput.setAttribute('required', 'required');
+        } else {
+            deliveryDateField.style.display = 'none';
+            serviceDateField.style.display = 'none';
+            deliveryDateInput.removeAttribute('required');
+            serviceDateInput.removeAttribute('required');
+        }
+    }
+    
+    document.getElementById('verificationForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            verification_type: document.getElementById('verification_type').value,
+            vendor_id: parseInt(document.getElementById('vendor_id').value),
+            equipment_id: parseInt(document.getElementById('equipment_id').value),
+            quality_assessment: document.getElementById('quality_assessment').value || null,
+            supporting_documents: document.getElementById('supporting_documents').value || null
+        };
+        
+        const verificationType = formData.verification_type;
+        if (verificationType === 'delivery') {
+            const deliveryDate = document.getElementById('delivery_date').value;
+            if (!deliveryDate) {
+                showToast('Delivery date is required', 'error');
+                return;
+            }
+            formData.delivery_date = deliveryDate;
+        } else if (verificationType === 'service') {
+            const serviceDate = document.getElementById('service_date').value;
+            if (!serviceDate) {
+                showToast('Service date is required', 'error');
+                return;
+            }
+            formData.service_date = serviceDate;
+        }
+        
+        try {
+            const response = await fetch('/api/delivery-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const data = result.data;
+                const resultHtml = `
+                    <div class="grid grid-2">
+                        <div>
+                            <p><strong>Verification ID:</strong> ${data.id}</p>
+                            <p><strong>Type:</strong> ${data.verification_type}</p>
+                            <p><strong>Status:</strong> <span class="status-badge status-${data.verification_status}">${data.verification_status}</span></p>
+                            <p><strong>Compliance Status:</strong> <span class="status-badge status-${data.compliance_status}">${data.compliance_status}</span></p>
+                        </div>
+                        <div>
+                            ${data.delivery_date ? `<p><strong>Delivery Date:</strong> ${data.delivery_date}</p>` : ''}
+                            ${data.service_date ? `<p><strong>Service Date:</strong> ${data.service_date}</p>` : ''}
+                            ${data.quality_assessment ? `<p><strong>Quality Assessment:</strong> ${data.quality_assessment}</p>` : ''}
+                        </div>
+                    </div>
+                    <p style="margin-top: 1rem; color: #64748b;">Verification created successfully. It is now pending review by DGM.</p>
+                `;
+                
+                document.getElementById('verificationResultContent').innerHTML = resultHtml;
+                document.getElementById('verificationResultCard').style.display = 'block';
+                document.getElementById('verificationForm').reset();
+                toggleDateFields();
+                
+                showToast('Verification created successfully!', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = '/dashboard/engineer?refresh=' + Date.now();
+                }, 3000);
+            } else {
+                showToast(result.message || 'Error creating verification', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Monitoring Form{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.technician_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.daily_monitoring') }}" class="active">Daily Monitoring</a>
+<a href="{{ url_for('forms.equipment_status') }}">Equipment Status</a>
+<a href="{{ url_for('views.monitoring_history') }}">Monitoring History</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Daily Monitoring Form - APDS</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Monitor equipment performance and operational status</p>
+    </div>
+    
+    <!-- DMO Operations Panel -->
+    <div class="dmo-panel" style="padding: 1rem 1.5rem; background-color: #0f0f1a; border-bottom: 1px solid var(--card-border);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <button type="button" id="btnAdd" class="btn btn-sm btn-primary" title="Add new monitoring record">Add</button>
+            <button type="button" id="btnEdit" class="btn btn-sm btn-primary" title="Edit selected record">Edit</button>
+            <button type="button" id="btnDelete" class="btn btn-sm btn-danger" title="Delete selected record">Delete</button>
+            <button type="button" id="btnSave" class="btn btn-sm btn-success" title="Save current record">Save</button>
+            <button type="button" id="btnCancel" class="btn btn-sm btn-secondary" title="Cancel current operation">Cancel</button>
+            <div style="flex: 1; min-width: 200px;">
+                <input type="text" id="searchInput" class="form-input" placeholder="Search records..." style="width: 100%;">
+            </div>
+            <button type="button" id="btnSearch" class="btn btn-sm btn-info" title="Search records">Search</button>
+            <button type="button" id="btnRefresh" class="btn btn-sm btn-secondary" title="Refresh data">Refresh</button>
+            <button type="button" id="btnLoadDefaults" class="btn btn-sm btn-secondary" title="Load default values">Load Defaults</button>
+            <button type="button" id="btnHelp" class="btn btn-sm btn-info" title="Show help">Help</button>
+        </div>
+    </div>
+    
+    <!-- DNO Navigation Panel -->
+    <div class="dno-panel" style="padding: 0.75rem 1.5rem; background-color: #0a0a15; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btnFirst" class="btn btn-sm btn-secondary" title="Go to first record">⏮ First</button>
+            <button type="button" id="btnPrevious" class="btn btn-sm btn-secondary" title="Go to previous record">⏪ Previous</button>
+            <button type="button" id="btnNext" class="btn btn-sm btn-secondary" title="Go to next record">Next ⏩</button>
+            <button type="button" id="btnLast" class="btn btn-sm btn-secondary" title="Go to last record">Last ⏭</button>
+        </div>
+        <div id="recordInfo" style="color: var(--text-secondary); font-size: 0.9rem;">No records</div>
+    </div>
+    
+    <form id="monitoringForm" name="mainForm" class="form-container" style="padding: 1.5rem;">
+        <input type="hidden" id="monitoring_id" name="monitoring_id">
+        <div class="form-group">
+            <label class="form-label" for="equipment_id" title="Select the equipment to monitor. Required field.">Equipment *</label>
+            <select class="form-select" id="equipment_id" name="equipment_id" required 
+                    title="Select the equipment to monitor. This field is required.">
+                <option value="">Select Equipment</option>
+                {% for eq in equipment %}
+                <option value="{{ eq.id }}" {% if selected_equipment_id == eq.id|string %}selected{% endif %}>
+                    {{ eq.equipment_code }} - {{ eq.equipment_name }}
+                </option>
+                {% endfor %}
+            </select>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select equipment from the list</small>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="monitoring_date" title="Date of monitoring. Defaults to today.">Monitoring Date *</label>
+                <input type="date" class="form-input" id="monitoring_date" name="monitoring_date" required
+                       title="Enter the date of monitoring. Format: YYYY-MM-DD">
+                <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select monitoring date</small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="shift" title="Select the shift during which monitoring was performed">Shift *</label>
+                <select class="form-select" id="shift" name="shift" required
+                        title="Select the shift: Morning, Afternoon, or Night">
+                    <option value="">Select Shift</option>
+                    <option value="morning">Morning</option>
+                    <option value="afternoon">Afternoon</option>
+                    <option value="night">Night</option>
+                </select>
+                <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select shift period</small>
+            </div>
+        </div>
+        
+        <div class="card" style="margin: 1.5rem 0; padding: 1rem; background-color: #f8fafc;">
+            <h3 style="margin-bottom: 1rem; color: #1e293b;">Technical Readings (APDS)</h3>
+            <div class="grid grid-3">
+                <div class="form-group">
+                    <label class="form-label" for="voltage" title="Voltage reading in Volts. Normal range: 220-240V">Voltage (V) *</label>
+                    <input type="number" step="0.1" min="0" max="500" class="form-input" id="voltage" name="voltage" required 
+                           placeholder="e.g., 230.0" title="Enter voltage reading. Valid range: 0-500V">
+                    <small style="color: #64748b;">Required: Normal range: 220-240V</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="current" title="Current reading in Amperes">Current (A) *</label>
+                    <input type="number" step="0.1" min="0" max="1000" class="form-input" id="current" name="current" required 
+                           placeholder="e.g., 50.0" title="Enter current reading in Amperes. Valid range: 0-1000A">
+                    <small style="color: #64748b;">Required: Current in Amperes</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="power_factor" title="Power factor value. Range: 0.0 to 1.0. Optimal: > 0.90">Power Factor (PF) *</label>
+                    <input type="number" step="0.01" min="0" max="1" class="form-input" id="power_factor" name="power_factor" required 
+                           placeholder="e.g., 0.95" title="Enter power factor. Valid range: 0.0 - 1.0">
+                    <small style="color: #64748b;">Required: Range: 0.0 - 1.0 (Optimal: > 0.90)</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="operational_status" title="Current operational status of the equipment">Operational Status *</label>
+            <select class="form-select" id="operational_status" name="operational_status" required
+                    title="Select operational status: Normal, Warning, or Critical">
+                <option value="">Select Status</option>
+                <option value="normal">Normal</option>
+                <option value="warning">Warning</option>
+                <option value="critical">Critical</option>
+            </select>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Select current operational status</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="observations" title="Additional observations or notes about the monitoring">Observations</label>
+            <textarea class="form-textarea" id="observations" name="observations" rows="4" 
+                      placeholder="Enter any additional observations or notes..."
+                      title="Optional: Enter any observations or notes about the monitoring"></textarea>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Optional: Add any observations or notes</small>
+        </div>
+        
+        <!-- Feedback Panel -->
+        <div id="feedbackPanel" style="margin-top: 1rem; padding: 0.75rem; background-color: #0a0a15; border-radius: 6px; display: none;">
+            <div id="feedbackMessage" style="color: var(--text-primary);"></div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let monitoringRecords = [];
+    let currentRecordIndex = -1;
+    
+    // Initialize DMO/DNO
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set today's date as default
+        const dateInput = document.getElementById('monitoring_date');
+        if (dateInput && !dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+        
+        // Initialize DMO/DNO operations
+        const { dmo, dno, support } = initializeDMO_DNO({
+            dmo: {
+                formId: 'monitoringForm',
+                apiEndpoint: '/api/monitoring',
+                onSave: function(data) {
+                    loadMonitoringRecords();
+                },
+                onDelete: function(id) {
+                    loadMonitoringRecords();
+                },
+                onCancel: function() {
+                    // Reset form
+                },
+                onSearch: function(query) {
+                    searchRecords(query);
+                },
+                onRefresh: function() {
+                    loadMonitoringRecords();
+                },
+                onLoadDefaults: function() {
+                    // Set defaults
+                    const dateInput = document.getElementById('monitoring_date');
+                    if (dateInput) {
+                        dateInput.value = new Date().toISOString().split('T')[0];
+                    }
+                    document.getElementById('shift').value = '';
+                    document.getElementById('operational_status').value = '';
+                },
+                onHelp: function() {
+                    alert('Daily Monitoring Form Help:\n\n' +
+                          '1. Select equipment and enter monitoring details\n' +
+                          '2. Use Add to create new records, Edit to modify, Delete to remove\n' +
+                          '3. Use navigation buttons to move between records\n' +
+                          '4. All fields marked with * are required\n' +
+                          '5. Use Search to find specific records\n' +
+                          '6. Click Help on any control for specific information');
+                }
+            },
+            dno: {
+                records: monitoringRecords,
+                onRecordChange: function(record, index) {
+                    populateForm(record);
+                    currentRecordIndex = index;
+                }
+            }
+        });
+        
+        // Add tooltips to controls
+        support.addTooltip('equipment_id', 'Select the equipment to monitor. This field is required.');
+        support.addTooltip('monitoring_date', 'Enter the date of monitoring. Defaults to today.');
+        support.addTooltip('shift', 'Select the shift: Morning, Afternoon, or Night.');
+        support.addTooltip('voltage', 'Enter voltage reading in Volts. Normal range: 220-240V.');
+        support.addTooltip('current', 'Enter current reading in Amperes.');
+        support.addTooltip('power_factor', 'Enter power factor. Range: 0.0-1.0. Optimal: > 0.90.');
+        support.addTooltip('operational_status', 'Select operational status: Normal, Warning, or Critical.');
+        support.addTooltip('observations', 'Optional: Enter any observations or notes.');
+        
+        // Load monitoring records
+        loadMonitoringRecords();
+    });
+    
+    // Load monitoring records for navigation
+    async function loadMonitoringRecords() {
+        try {
+            const response = await fetch('/api/monitoring/technician?limit=1000');
+            const result = await response.json();
+            if (result.success) {
+                monitoringRecords = result.data || [];
+                if (window.dno) {
+                    window.dno.setRecords(monitoringRecords);
+                }
+                showFeedback(`Loaded ${monitoringRecords.length} records`, 'success');
+            }
+        } catch (error) {
+            console.error('Error loading records:', error);
+        }
+    }
+    
+    // Populate form with record data
+    function populateForm(record) {
+        if (!record) return;
+        
+        const idField = document.getElementById('monitoring_id');
+        if (idField) {
+            idField.value = record.id || '';
+        }
+        
+        document.getElementById('equipment_id').value = record.equipment_id || '';
+        document.getElementById('monitoring_date').value = record.monitoring_date ? record.monitoring_date.split('T')[0] : '';
+        document.getElementById('shift').value = record.shift || '';
+        document.getElementById('voltage').value = record.voltage || '';
+        document.getElementById('current').value = record.current || '';
+        document.getElementById('power_factor').value = record.power_factor || '';
+        document.getElementById('operational_status').value = record.operational_status || '';
+        document.getElementById('observations').value = record.observations || '';
+        
+        if (window.dmo) {
+            window.dmo.currentRecordId = record.id;
+            window.dmo.isEditMode = !!record.id;
+            window.dmo.updateButtonStates();
+        }
+    }
+    
+    // Search records
+    function searchRecords(query) {
+        if (!query) {
+            loadMonitoringRecords();
+            return;
+        }
+        
+        const filtered = monitoringRecords.filter(r => {
+            const searchStr = query.toLowerCase();
+            return (r.equipment_id && r.equipment_id.toString().includes(searchStr)) ||
+                   (r.shift && r.shift.toLowerCase().includes(searchStr)) ||
+                   (r.operational_status && r.operational_status.toLowerCase().includes(searchStr));
+        });
+        
+        if (window.dno) {
+            window.dno.setRecords(filtered);
+        }
+        showFeedback(`Found ${filtered.length} matching records`, 'info');
+    }
+    
+    // Show feedback
+    function showFeedback(message, type = 'info') {
+        const panel = document.getElementById('feedbackPanel');
+        const msg = document.getElementById('feedbackMessage');
+        if (panel && msg) {
+            panel.style.display = 'block';
+            msg.textContent = message;
+            panel.style.backgroundColor = type === 'success' ? 'rgba(0, 255, 136, 0.1)' :
+                                         type === 'error' ? 'rgba(255, 51, 102, 0.1)' :
+                                         type === 'warning' ? 'rgba(255, 170, 0, 0.1)' :
+                                         'rgba(0, 212, 255, 0.1)';
+            msg.style.color = type === 'success' ? '#00ff88' :
+                             type === 'error' ? '#ff3366' :
+                             type === 'warning' ? '#ffaa00' :
+                             '#00d4ff';
+            
+            setTimeout(() => {
+                panel.style.display = 'none';
+            }, 3000);
+        }
+    }
+    
+    // Override form submit to use DMO save
+    document.getElementById('monitoringForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Use DMO save if available
+        if (window.dmo) {
+            window.dmo.save();
+            return;
+        }
+        
+        // Fallback to original submit logic
+        const formData = {
+            equipment_id: document.getElementById('equipment_id').value,
+            monitoring_date: document.getElementById('monitoring_date').value,
+            shift: document.getElementById('shift').value,
+            voltage: parseFloat(document.getElementById('voltage').value) || null,
+            current: parseFloat(document.getElementById('current').value) || null,
+            power_factor: parseFloat(document.getElementById('power_factor').value) || null,
+            operational_status: document.getElementById('operational_status').value,
+            observations: document.getElementById('observations').value || null
+        };
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daily_monitoring.html:118',message:'monitoring form before fetch',data:{equipment_id:formData.equipment_id,operational_status:formData.operational_status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+        // #endregion
+        
+        try {
+            const response = await fetch('/api/monitoring', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daily_monitoring.html:128',message:'monitoring form response received',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+            // #endregion
+            
+            const result = await response.json();
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daily_monitoring.html:131',message:'monitoring form result parsed',data:{success:result.success,message:result.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+            // #endregion
+            
+            if (result.success) {
+                showToast('Monitoring record created successfully!', 'success');
+                setTimeout(() => {
+                    // Add timestamp to force refresh
+                    window.location.href = '/dashboard/technician?refresh=' + Date.now();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error creating monitoring record', 'error');
+            }
+        } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/04a8269d-cde1-47e2-8a0f-9f266a7e79dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daily_monitoring.html:138',message:'monitoring form error',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+            // #endregion
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

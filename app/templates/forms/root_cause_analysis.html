@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Root Cause Analysis{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.root_cause_analysis') }}" class="active">Root Cause Analysis</a>
+<a href="{{ url_for('forms.draft_resolution') }}">Draft Resolution</a>
+<a href="{{ url_for('views.fault_list') }}">Fault List</a>
+{% endblock %}
+
+{% block content %}
+{% if fault %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Fault Information</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p><strong>Fault ID:</strong> #{{ fault.id }}</p>
+        <p><strong>Equipment ID:</strong> #{{ fault.equipment_id }}</p>
+        <p><strong>Description:</strong> {{ fault.fault_description }}</p>
+        <p><strong>Severity:</strong> <span class="status-badge status-{{ fault.severity }}">{{ fault.severity }}</span></p>
+        <p><strong>Status:</strong> <span class="status-badge status-{{ fault.status }}">{{ fault.status }}</span></p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Root Cause Analysis Form</h2>
+    </div>
+    <form id="rcaForm" class="form-container" style="padding: 1.5rem;">
+        {% if fault %}
+        <input type="hidden" id="fault_id" name="fault_id" value="{{ fault.id }}">
+        {% else %}
+        <div class="form-group">
+            <label class="form-label" for="fault_id">Fault ID *</label>
+            <input type="number" class="form-input" id="fault_id" name="fault_id" required>
+        </div>
+        {% endif %}
+        
+        <div class="form-group">
+            <label class="form-label" for="root_cause">Root Cause *</label>
+            <textarea class="form-textarea" id="root_cause" name="root_cause" rows="6" required placeholder="Describe the root cause of the fault..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="contributing_factors">Contributing Factors</label>
+            <textarea class="form-textarea" id="contributing_factors" name="contributing_factors" rows="4" placeholder="List any contributing factors..."></textarea>
+        </div>
+        
+        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Submit Analysis</button>
+            <a href="{{ url_for('dashboard.engineer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('rcaForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            fault_id: document.getElementById('fault_id').value,
+            root_cause: document.getElementById('root_cause').value,
+            contributing_factors: document.getElementById('contributing_factors').value || null
+        };
+        
+        try {
+            const response = await fetch('/api/rca', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Root cause analysis submitted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard/engineer?refresh=' + Date.now();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error submitting analysis', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+</script>
+{% endblock %}
+

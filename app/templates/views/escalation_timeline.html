@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Escalation Timeline{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('views.escalation_timeline') }}" class="active">Escalation Timeline</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Escalation Timeline</h2>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p class="empty-state">Escalation timeline view - To be implemented with full escalation data</p>
+    </div>
+</div>
+{% endblock %}
+
+
+
+

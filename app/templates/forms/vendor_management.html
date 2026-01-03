@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Management - APDS{% endblock %}
+
+{% block sidebar_menu %}
+<a href="{{ url_for('dashboard.engineer_dashboard') }}">Dashboard</a>
+<a href="{{ url_for('forms.vendor_management') }}" class="active">Vendor Management</a>
+<a href="{{ url_for('forms.delivery_verification') }}">Delivery Verification</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Vendor Management - APDS</h2>
+        <p style="color: #64748b; margin-top: 0.5rem;">Manage vendor information and details</p>
+    </div>
+    
+    <!-- DMO Operations Panel -->
+    <div class="dmo-panel" style="padding: 1rem 1.5rem; background-color: #0f0f1a; border-bottom: 1px solid var(--card-border);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <button type="button" id="btnAdd" class="btn btn-sm btn-primary" title="Add new vendor">Add</button>
+            <button type="button" id="btnEdit" class="btn btn-sm btn-primary" title="Edit selected vendor">Edit</button>
+            <button type="button" id="btnDelete" class="btn btn-sm btn-danger" title="Delete selected vendor">Delete</button>
+            <button type="button" id="btnSave" class="btn btn-sm btn-success" title="Save current vendor">Save</button>
+            <button type="button" id="btnCancel" class="btn btn-sm btn-secondary" title="Cancel current operation">Cancel</button>
+            <div style="flex: 1; min-width: 200px;">
+                <input type="text" id="searchInput" class="form-input" placeholder="Search vendors..." style="width: 100%;">
+            </div>
+            <button type="button" id="btnSearch" class="btn btn-sm btn-info" title="Search vendors">Search</button>
+            <button type="button" id="btnRefresh" class="btn btn-sm btn-secondary" title="Refresh data">Refresh</button>
+            <button type="button" id="btnLoadDefaults" class="btn btn-sm btn-secondary" title="Load default values">Load Defaults</button>
+            <button type="button" id="btnHelp" class="btn btn-sm btn-info" title="Show help">Help</button>
+        </div>
+    </div>
+    
+    <!-- DNO Navigation Panel -->
+    <div class="dno-panel" style="padding: 0.75rem 1.5rem; background-color: #0a0a15; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btnFirst" class="btn btn-sm btn-secondary" title="Go to first vendor">⏮ First</button>
+            <button type="button" id="btnPrevious" class="btn btn-sm btn-secondary" title="Go to previous vendor">⏪ Previous</button>
+            <button type="button" id="btnNext" class="btn btn-sm btn-secondary" title="Go to next vendor">Next ⏩</button>
+            <button type="button" id="btnLast" class="btn btn-sm btn-secondary" title="Go to last vendor">Last ⏭</button>
+        </div>
+        <div id="recordInfo" style="color: var(--text-secondary); font-size: 0.9rem;">No records</div>
+    </div>
+    
+    <form id="vendorForm" name="mainForm" style="padding: 1.5rem;">
+        {% if vendor %}
+        <input type="hidden" id="vendor_id" name="vendor_id" value="{{ vendor.id }}">
+        <div class="card" style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc;">
+            <p><strong>Editing:</strong> {{ vendor.vendor_name }} ({{ vendor.vendor_code }})</p>
+        </div>
+        {% endif %}
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="vendor_name" title="Enter the vendor company name">Vendor Name *</label>
+                <input type="text" class="form-input" id="vendor_name" name="vendor_name" required 
+                       value="{{ vendor.vendor_name if vendor else '' }}" placeholder="Enter vendor name"
+                       title="Enter the full name of the vendor company">
+                <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Enter vendor company name</small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="vendor_code" title="Unique vendor code identifier">Vendor Code *</label>
+                <input type="text" class="form-input" id="vendor_code" name="vendor_code" required 
+                       value="{{ vendor.vendor_code if vendor else '' }}" placeholder="e.g., VND001" {% if vendor %}readonly{% endif %}
+                       title="Enter unique vendor code (e.g., VND001). Cannot be changed after creation.">
+                {% if vendor %}
+                <small style="color: #64748b; display: block; margin-top: 0.25rem;">Vendor code cannot be changed</small>
+                {% else %}
+                <small style="color: #64748b; display: block; margin-top: 0.25rem;">Required: Enter unique vendor code</small>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="contact_info" title="Vendor contact information">Contact Information</label>
+            <textarea class="form-textarea" id="contact_info" name="contact_info" rows="3" 
+                      placeholder="Enter contact details (phone, email, address)..."
+                      title="Optional: Enter vendor contact information including phone, email, and address">{{ vendor.contact_info if vendor else '' }}</textarea>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Optional: Enter contact details</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="material_list" title="List of materials or services">Material List</label>
+            <textarea class="form-textarea" id="material_list" name="material_list" rows="4" 
+                      placeholder="Enter list of materials or services provided by this vendor..."
+                      title="Optional: List materials or services provided by this vendor">{{ vendor.material_list if vendor else '' }}</textarea>
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Optional: List materials or services</small>
+        </div>
+        
+        {% if vendor %}
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" id="is_active" name="is_active" {% if vendor.is_active %}checked{% endif %}>
+                Active Vendor
+            </label>
+            <small style="color: #64748b; display: block; margin-top: 0.5rem;">Uncheck to deactivate this vendor</small>
+        </div>
+        {% endif %}
+        
+        <!-- Feedback Panel -->
+        <div id="feedbackPanel" style="margin-top: 1rem; padding: 0.75rem; background-color: #0a0a15; border-radius: 6px; display: none;">
+            <div id="feedbackMessage" style="color: var(--text-primary);"></div>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Existing Vendors</h3>
+    </div>
+    <div style="padding: 1.5rem;">
+        {% if vendors %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Contact Info</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vendors %}
+                    <tr>
+                        <td>{{ v.vendor_code }}</td>
+                        <td>{{ v.vendor_name }}</td>
+                        <td>{{ v.contact_info[:50] if v.contact_info else '-' }}{% if v.contact_info and v.contact_info|length > 50 %}...{% endif %}</td>
+                        <td><span class="status-badge status-{{ 'active' if v.is_active else 'inactive' }}">{{ 'Active' if v.is_active else 'Inactive' }}</span></td>
+                        <td>
+                            <a href="{{ url_for('forms.vendor_management', vendor_id=v.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                            {% if v.is_active %}
+                            <button class="btn btn-sm btn-warning" onclick="deactivateVendor({{ v.id }})">Deactivate</button>
+                            {% else %}
+                            <button class="btn btn-sm btn-success" onclick="activateVendor({{ v.id }})">Activate</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="color: #64748b;">No vendors found. Create your first vendor above.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let vendorRecords = [];
+    let currentRecordIndex = -1;
+    
+    // Initialize DMO/DNO
+    document.addEventListener('DOMContentLoaded', function() {
+        const { dmo, dno, support } = initializeDMO_DNO({
+            dmo: {
+                formId: 'vendorForm',
+                apiEndpoint: '/api/vendors',
+                onSave: function(data) {
+                    loadVendorRecords();
+                },
+                onDelete: function(id) {
+                    loadVendorRecords();
+                },
+                onSearch: function(query) {
+                    searchRecords(query);
+                },
+                onRefresh: function() {
+                    loadVendorRecords();
+                },
+                onLoadDefaults: function() {
+                    // Clear form for new entry
+                },
+                onHelp: function() {
+                    alert('Vendor Management Help:\n\n' +
+                          '1. Enter vendor name and unique code\n' +
+                          '2. Add contact information and material list\n' +
+                          '3. Use Add to create new vendors, Edit to modify, Delete to remove\n' +
+                          '4. Use navigation buttons to move between vendors\n' +
+                          '5. Required fields: Vendor Name, Vendor Code');
+                }
+            },
+            dno: {
+                records: vendorRecords,
+                onRecordChange: function(record, index) {
+                    if (record) {
+                        window.location.href = `{{ url_for('forms.vendor_management') }}?vendor_id=${record.id}`;
+                    }
+                }
+            }
+        });
+        
+        // Add tooltips
+        support.addTooltip('vendor_name', 'Enter the full name of the vendor company.');
+        support.addTooltip('vendor_code', 'Enter unique vendor code. Cannot be changed after creation.');
+        support.addTooltip('contact_info', 'Optional: Enter vendor contact information.');
+        support.addTooltip('material_list', 'Optional: List materials or services provided.');
+        
+        loadVendorRecords();
+    });
+    
+    async function loadVendorRecords() {
+        try {
+            const response = await fetch('/api/vendors?active_only=false');
+            const result = await response.json();
+            if (result.success) {
+                vendorRecords = result.data || [];
+                if (window.dno) {
+                    window.dno.setRecords(vendorRecords);
+                }
+                showFeedback(`Loaded ${vendorRecords.length} vendors`, 'success');
+            }
+        } catch (error) {
+            console.error('Error loading records:', error);
+        }
+    }
+    
+    function searchRecords(query) {
+        if (!query) {
+            loadVendorRecords();
+            return;
+        }
+        const filtered = vendorRecords.filter(v => {
+            const searchStr = query.toLowerCase();
+            return (v.vendor_name && v.vendor_name.toLowerCase().includes(searchStr)) ||
+                   (v.vendor_code && v.vendor_code.toLowerCase().includes(searchStr));
+        });
+        if (window.dno) {
+            window.dno.setRecords(filtered);
+        }
+        showFeedback(`Found ${filtered.length} matching vendors`, 'info');
+    }
+    
+    function showFeedback(message, type = 'info') {
+        const panel = document.getElementById('feedbackPanel');
+        const msg = document.getElementById('feedbackMessage');
+        if (panel && msg) {
+            panel.style.display = 'block';
+            msg.textContent = message;
+            panel.style.backgroundColor = type === 'success' ? 'rgba(0, 255, 136, 0.1)' :
+                                         type === 'error' ? 'rgba(255, 51, 102, 0.1)' :
+                                         type === 'warning' ? 'rgba(255, 170, 0, 0.1)' :
+                                         'rgba(0, 212, 255, 0.1)';
+            msg.style.color = type === 'success' ? '#00ff88' :
+                             type === 'error' ? '#ff3366' :
+                             type === 'warning' ? '#ffaa00' :
+                             '#00d4ff';
+            setTimeout(() => { panel.style.display = 'none'; }, 3000);
+        }
+    }
+    
+    document.getElementById('vendorForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Use DMO save if available
+        if (window.dmo) {
+            window.dmo.save();
+            return;
+        }
+        
+        // Fallback
+        const vendorId = document.getElementById('vendor_id');
+        const formData = {
+            vendor_name: document.getElementById('vendor_name').value,
+            vendor_code: document.getElementById('vendor_code').value,
+            contact_info: document.getElementById('contact_info').value || null,
+            material_list: document.getElementById('material_list').value || null
+        };
+        
+        if (vendorId) {
+            const isActiveCheckbox = document.getElementById('is_active');
+            if (isActiveCheckbox) {
+                formData.is_active = isActiveCheckbox.checked;
+            }
+        }
+        
+        try {
+            let url = '/api/vendors';
+            let method = 'POST';
+            
+            if (vendorId && vendorId.value) {
+                url = `/api/vendors/${vendorId.value}`;
+                method = 'PUT';
+            }
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(vendorId && vendorId.value ? 'Vendor updated successfully!' : 'Vendor created successfully!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error saving vendor', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+    
+    async function deactivateVendor(vendorId) {
+        if (!confirm('Are you sure you want to deactivate this vendor?')) return;
+        
+        try {
+            const response = await fetch(`/api/vendors/${vendorId}/deactivate`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Vendor deactivated successfully', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error deactivating vendor', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    }
+    
+    async function activateVendor(vendorId) {
+        try {
+            const response = await fetch(`/api/vendors/${vendorId}/activate`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Vendor activated successfully', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showToast(result.message || 'Error activating vendor', 'error');
+            }
+        } catch (error) {
+            showToast('Network error. Please try again.', 'error');
+        }
+    }
+    
+    async function deleteVendor(vendorId) {
+        if (!confirm('Are you sure you want to delete this vendor? This action cannot be undone.')) return;
+        
+        // Note: We don't have a delete endpoint, so we'll just deactivate
+        await deactivateVendor(vendorId);
+    }
+</script>
+{% endblock %}
+
+
+
+
