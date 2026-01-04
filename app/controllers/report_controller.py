@@ -130,7 +130,7 @@ class ReportController:
             for report in regular_data:
                 report['report_type'] = 'resolution'
                 report['type_label'] = 'Resolution Report'
-                user = self.auth_service.get_user_by_id(report.get("technician_id"))
+                user = self.auth_service.get_user_by_id(report.get("prepared_by"))
                 report["prepared_by"] = user.full_name if user else "Unknown"
                 all_reports.append(report)
             # Add performance reports with type indicator
