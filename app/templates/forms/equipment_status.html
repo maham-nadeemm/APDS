@@ -22,8 +22,8 @@
                     <th>Type</th>
                     <th>Location</th>
                     <th>Status</th>
-                    <th>Last Maintenance</th>
-                    <th>Next Maintenance</th>
+                    <!-- <th>Last Maintenance</th> -->
+                    <!-- <th>Next Maintenance</th> -->
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -39,8 +39,8 @@
                             {{ eq.status }}
                         </span>
                     </td>
-                    <td>{{ eq.last_maintenance_date or '-' }}</td>
-                    <td>{{ eq.next_maintenance_date or '-' }}</td>
+                    <!-- <td>{{ eq.last_maintenance_date or '-' }}</td> -->
+                    <!-- <td>{{ eq.next_maintenance_date or '-' }}</td> -->
                     <td>
                         <a href="{{ url_for('forms.report_fault', equipment_id=eq.id) }}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Report Fault</a>
                     </td>
