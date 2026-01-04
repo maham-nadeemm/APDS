@@ -104,7 +104,8 @@ def report_review():
     
     report = None
     if report_id:
-        report_result = report_controller.get_report(int(report_id))
+        # report_result = report_controller.get_report(int(report_id))
+        report_result = report_controller.get_perf_report(int(report_id))
         if report_result.get('success'):
             report = report_result.get('data')
     

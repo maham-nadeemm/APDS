@@ -10,6 +10,7 @@ class ReportController:
 
     def __init__(self):
         self.report_service = ServiceFactory.create_report_service()
+        self.perf_report_service = ServiceFactory.create_performance_report_service()
         self.auth_service = ServiceFactory.create_auth_service()
 
     def create_draft_report(self, data: dict) -> dict:
@@ -65,6 +66,20 @@ class ReportController:
             return {
                 'success': True,
                 'message': 'Report approved',
+                'data': report.to_dict()
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': str(e)
+            }
+    
+    def get_perf_report(self, report_id: int) -> dict:
+        """Get performance report by ID"""
+        try:
+            report = self.perf_report_service.get_report_by_id(report_id)
+            return {
+                'success': True,
                 'data': report.to_dict()
             }
         except Exception as e:
