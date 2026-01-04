@@ -88,7 +88,8 @@
                     tbody.innerHTML = data.data.map(report => `
                         <tr>
                             <td>#${report.id}</td>
-                            <td>${report.prepared_by}</td>
+                            <td>#${report?.fault_id ?? '-'}</td>
+                            <td>${report?.prepared_by ?? '-'}</td>
                             <td>${report.created_at ? new Date(report.created_at).toLocaleDateString() : '-'}</td>
                             <td>
                                 <a href="/views/report-review?report_id=${report.id}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Review</a>

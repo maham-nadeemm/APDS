@@ -171,7 +171,7 @@
                                     <td>#${report.id}</td>
                                     <td>${faultId}</td>
                                     <td>${typeLabel}</td>
-                                    <td>User #${report.prepared_by || report.technician_id || '-'}</td>
+                                    <td>${report.prepared_by || report.technician_id || '-'}</td>
                                     <td><span class="status-badge status-pending">${report.status}</span></td>
                                     <td>${report.created_at ? new Date(report.created_at).toLocaleDateString() : '-'}</td>
                                     <td>
