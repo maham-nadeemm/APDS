@@ -13,16 +13,16 @@ class DatabaseConnection:
     """
     _instance: Optional['DatabaseConnection'] = None
     _connection: Optional[sqlite3.Connection] = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DatabaseConnection, cls).__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         if self._connection is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'operations_monitoring.db')
-            
+
             # Check if database file exists and is accessible
             if os.path.exists(db_path):
                 # Check if file is locked by another process
@@ -37,7 +37,7 @@ class DatabaseConnection:
                     print("=" * 80)
                     print("Attempting to connect with retry logic...")
                     print("")
-            
+
             # Add timeout to handle database locks (30 seconds)
             max_retries = 3
             for attempt in range(max_retries):
@@ -53,13 +53,13 @@ class DatabaseConnection:
                         continue
                     else:
                         raise
-            
+
             # Set busy timeout FIRST before any other operations
             try:
                 self._connection.execute("PRAGMA busy_timeout = 30000")
             except sqlite3.OperationalError:
                 pass  # If database is locked, continue anyway
-            
+
             # Enable WAL mode for better concurrency (with error handling)
             try:
                 self._connection.execute("PRAGMA journal_mode = WAL")
@@ -76,13 +76,13 @@ class DatabaseConnection:
                         print(f"Current journal mode: {result[0]}")
                 except:
                     pass
-            
+
             # Enable foreign key constraints
             try:
                 self._connection.execute("PRAGMA foreign_keys = ON")
             except sqlite3.OperationalError:
                 pass  # Continue even if this fails
-            
+
             # Create tables (with error handling)
             try:
                 self._create_tables()
@@ -92,7 +92,7 @@ class DatabaseConnection:
                     print("Please close any other applications using the database and restart the application.")
                 else:
                     raise
-    
+
     def _check_database_accessible(self, db_path: str) -> bool:
         """Check if database file is accessible (not locked)"""
         try:
@@ -104,11 +104,11 @@ class DatabaseConnection:
             return False
         except Exception:
             return True  # If it's a different error, assume it's accessible
-    
+
     def _create_tables(self):
         """Create all database tables"""
         cursor = self._connection.cursor()
-        
+
         # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -123,7 +123,7 @@ class DatabaseConnection:
                 is_active INTEGER DEFAULT 1
             )
         """)
-        
+
         # Equipment table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS equipment (
@@ -138,13 +138,14 @@ class DatabaseConnection:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Daily Monitoring table (APDS: Voltage, Current, Power Factor)
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS daily_monitoring (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                equipment_id INTEGER NOT NULL,
-                technician_id INTEGER NOT NULL,
+                equipment_id INTEGER NULL,
+                technician_id INTEGER NULL,
                 monitoring_date DATE NOT NULL,
                 shift TEXT CHECK(shift IN ('morning', 'afternoon', 'night')),
                 voltage REAL,
@@ -156,8 +157,9 @@ class DatabaseConnection:
                 FOREIGN KEY (equipment_id) REFERENCES equipment(id),
                 FOREIGN KEY (technician_id) REFERENCES users(id)
             )
-        """)
-        
+        """
+        )
+
         # Faults table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS faults (
@@ -173,7 +175,7 @@ class DatabaseConnection:
                 FOREIGN KEY (reported_by) REFERENCES users(id)
             )
         """)
-        
+
         # Root Cause Analysis table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS root_cause_analysis (
@@ -187,7 +189,7 @@ class DatabaseConnection:
                 FOREIGN KEY (analyzed_by) REFERENCES users(id)
             )
         """)
-        
+
         # Resolution Reports table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS resolution_reports (
@@ -208,7 +210,7 @@ class DatabaseConnection:
                 FOREIGN KEY (approved_by) REFERENCES users(id)
             )
         """)
-        
+
         # Notifications table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
@@ -224,7 +226,7 @@ class DatabaseConnection:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-        
+
         # Escalations table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS escalations (
@@ -242,7 +244,7 @@ class DatabaseConnection:
                 FOREIGN KEY (escalated_to) REFERENCES users(id)
             )
         """)
-        
+
         # Performance Reports table (UC-04)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS performance_reports (
@@ -262,7 +264,7 @@ class DatabaseConnection:
                 FOREIGN KEY (approved_by) REFERENCES users(id)
             )
         """)
-        
+
         # Technical References table (UC-07)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS technical_references (
@@ -280,7 +282,7 @@ class DatabaseConnection:
                 FOREIGN KEY (engineer_id) REFERENCES users(id)
             )
         """)
-        
+
         # Documentation Packages table (UC-09, UC-10)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documentation_packages (
@@ -300,7 +302,7 @@ class DatabaseConnection:
                 FOREIGN KEY (approved_by) REFERENCES users(id)
             )
         """)
-        
+
         # Documentation Items table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documentation_items (
@@ -315,7 +317,7 @@ class DatabaseConnection:
                 FOREIGN KEY (package_id) REFERENCES documentation_packages(id)
             )
         """)
-        
+
         # Vendors table (UC-15)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS vendors (
@@ -328,7 +330,7 @@ class DatabaseConnection:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Delivery/Service Verification table (UC-13, UC-14, UC-15)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS delivery_service_verification (
@@ -354,7 +356,7 @@ class DatabaseConnection:
                 FOREIGN KEY (verified_by) REFERENCES users(id)
             )
         """)
-        
+
         # Data Re-verification table (UC-05)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS data_reverification (
@@ -382,7 +384,7 @@ class DatabaseConnection:
                 FOREIGN KEY (engineer_id) REFERENCES users(id)
             )
         """)
-        
+
         # Audit Log table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS audit_logs (
@@ -399,7 +401,7 @@ class DatabaseConnection:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-        
+
         try:
             self._connection.commit()
         except sqlite3.OperationalError as e:
@@ -414,18 +416,17 @@ class DatabaseConnection:
                     pass
             else:
                 raise
-    
+
     def get_connection(self):
         """Get database connection"""
         return self._connection
-    
+
     def init_app(self, app):
         """Initialize with Flask app"""
         pass
-    
+
     def close(self):
         """Close database connection"""
         if self._connection:
             self._connection.close()
             self._connection = None
-
