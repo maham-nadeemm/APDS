@@ -3,3 +3,5 @@
 
 # Ignore all __pycache__ folders, regardless of their location
 **/__pycache__/
+
+operations_monitoring.db
